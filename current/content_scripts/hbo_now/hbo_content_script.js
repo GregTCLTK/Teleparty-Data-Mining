@@ -652,7 +652,13 @@ var injectContentScript = function () {
   
       // icon state
       // BUGFIX: fix content verification errors due to case insensitivity (https://groups.google.com/a/chromium.org/forum/#!searchin/chromium-extensions/%E2%80%9CThis$20extension$20may$20have$20been$20corrupted%E2%80%9D$20%7Csort:date/chromium-extensions/DrSVKXkPCSU/Zw4dg_4MBgAJ)
-      var icons = ["Batman.svg", "DeadPool.svg", "CptAmerica.svg", "Wolverine.svg", "IronMan.svg", "Goofy.svg", "Alien.svg", "Mulan.svg", "Snow-White.svg", "Poohbear.svg", "Sailormoon.svg", "Sailor Cat.svg", "Pizza.svg", "Cookie.svg", "Chocobar.svg", "hotdog.svg", "Hamburger.svg", "Popcorn.svg", "IceCream.svg", "ChickenLeg.svg"]
+      var oldIcons = ["Batman.svg","DeadPool.svg", "CptAmerica.svg", "Wolverine.svg", "IronMan.svg", "Goofy.svg", "Alien.svg", "Mulan.svg", "Snow-White.svg", "Poohbear.svg", "Sailormoon.svg", "Sailor Cat.svg", "Pizza.svg", "Cookie.svg", "Chocobar.svg", "hotdog.svg", "Hamburger.svg", "Popcorn.svg", "IceCream.svg", "ChickenLeg.svg"]
+
+  var newIcons = ["General/Alien.svg","General/Batman.svg","General/ChickenLeg.svg","General/Chocobar.svg","General/Cookie.svg","General/CptAmerica.svg","General/DeadPool.svg","General/Goofy.svg","General/Hamburger.svg","General/hotdog.svg","General/IceCream.svg","General/IronMan.svg","General/Mulan.svg","General/Pizza.svg","General/Poohbear.svg","General/Popcorn.svg","General/Sailor Cat.svg","General/Sailormoon.svg","General/Snow-White.svg","General/Wolverine.svg","Christmas/angel.svg","Christmas/bell.svg","Christmas/box.svg","Christmas/cane.svg","Christmas/flake.svg","Christmas/gingerbread.svg","Christmas/gingerbread_F.svg","Christmas/gingerbread_M.svg","Christmas/gloves_blue.svg","Christmas/gloves_red.svg","Christmas/hat.svg","Christmas/ornament.svg","Christmas/raindeer.svg","Christmas/reef.svg","Christmas/santa_F.svg","Christmas/santa_M.svg","Christmas/snowglobe.svg","Christmas/snowman.svg","Christmas/sock.svg","Christmas/tree.svg"];
+  var iconMap = {"General":["Alien.svg","Batman.svg","ChickenLeg.svg","Chocobar.svg","Cookie.svg","CptAmerica.svg","DeadPool.svg","Goofy.svg","Hamburger.svg","hotdog.svg","IceCream.svg","IronMan.svg","Mulan.svg","Pizza.svg","Poohbear.svg","Popcorn.svg","Sailor Cat.svg","Sailormoon.svg","Snow-White.svg","Wolverine.svg"],"Christmas":["angel.svg","bell.svg","box.svg","cane.svg","flake.svg","gingerbread.svg","gingerbread_F.svg","gingerbread_M.svg","gloves_blue.svg","gloves_red.svg","hat.svg","ornament.svg","raindeer.svg","reef.svg","santa_F.svg","santa_M.svg","snowglobe.svg","snowman.svg","sock.svg","tree.svg"],};
+
+  // Pick a random old Icon to use with older versions.
+  var defaultIcon = oldIcons[Math.floor(Math.random() * oldIcons.length)];
       var iconsInUse = [];
       var userIcons = {};
   
@@ -661,62 +667,104 @@ var injectContentScript = function () {
   
       var userSettings = {};
   
-      var addIconButton = function(icon) {
+      var addIconButton = function(iconPath,iconHolder) {
         var iconButton = jQuery(`
           <a class="image-button">
-            <img class="img-class" src='${chrome.runtime.getURL('img/' + icon)}'>
+            <img class="img-class" src='${chrome.runtime.getURL('img/icons/' + iconPath)}'>
           </a>
-        `).appendTo(jQuery('#icon-holder')).data('icon', icon);
-  
+      `).appendTo(iconHolder).data('icon', iconPath);
       }
-  
+    
+      var loadIconMap = function() {
+        //Not used in the code, but can be run in development to update the HardCoded Icon Map
+        return new Promise((resolve,reject) => {
+          chrome.runtime.sendMessage({type: 'getIconMap'}, function(response) {
+            iconMap = response;
+            console.log(iconMap);
+            resolve();
+          });
+        })
+      }
+    
       var addIconSelector = function() {
-          for(var i =0; i < icons.length; i++) {
-              addIconButton(icons[i]);
-          }
-  
-          var buttons = jQuery(".image-button");
-      }
-  
-      // TODO: save icon url for userSettings in chrome storage?
-      var getUserIconURL = function(userId, userIcon) {
-          if(userIcons[userId]) {
-              return userIcons[userId] 
-          } else {
-          var iconURL;
-          if (userIcon) {
-            iconURL = chrome.runtime.getURL('img/' + userIcon);
-          }else {
-            iconURL = chrome.runtime.getURL('img/' + icons[Math.floor(Math.random() * icons.length)]);
-            if (iconsInUse.length < icons.length) {
-              while (iconsInUse.hasOwnProperty(iconURL)) {
-                iconURL = chrome.runtime.getURL('img/' + icons[Math.floor(Math.random() * icons.length)]);
-              }
-                  }
+        Object.keys(iconMap).forEach(function (categoryName) {
+            var icons = iconMap[categoryName];
+            var iconHolder = jQuery(`
+              <ul id="icon-holder"></ul>
+            `);
+            for (var icon of icons) {
+              addIconButton(`${categoryName}/${icon}`, iconHolder)
             }
-            userIcons[userId] = iconURL;
-            iconsInUse.push(iconURL);
-            return userIcons[userId];
+            var categorySection = jQuery(`
+              <div class="icon-holder-wrap">
+                <p class="extension-txt-indicator">${categoryName}</p>
+              </div>
+            `)
+            iconHolder.appendTo(categorySection);
+            categorySection.appendTo(jQuery('#icon-holder-template'));
+        });
+      }
+    
+      // TODO: save icon url for userSettings in chrome storage?
+      // FIX: escape icon URL
+      var getUserIconURL = function(userId, userIcon) {
+        if(userIcons[userId]) {
+          return userIcons[userId] 
+              return userIcons[userId] 
+          return userIcons[userId] 
+        } else {
+          var iconURL = null;
+          if (userIcon) {
+            if (userIcon.includes('?newIconUrl=')) {
+              var parsedIcon = userIcon.split('?newIconUrl=')[1];
+              var oldIcon = userIcon.split('?newIconUrl=')[0];
+              if (newIcons.includes(parsedIcon)) {
+                iconURL = chrome.runtime.getURL('img/icons/' + parsedIcon);
+              }else if(oldIcons.includes(oldIcon)) {
+                iconURL = chrome.runtime.getURL('img/icons/General/' + oldIcon);
+              }
+            }else {
+              if (newIcons.includes(userIcon)) {
+                // Work with new icons that don't use the query for future versions
+                iconURL = chrome.runtime.getURL('img/icons/' + userIcon);
+              }else if(oldIcons.includes(userIcon)) {
+                // Work with Old version icons
+                iconURL = chrome.runtime.getURL('img/icons/General/' + userIcon);
+              }
+            }
+          }  
+          if (iconURL == null) {
+            // Load default icon for user.
+            iconURL = chrome.runtime.getURL('img/icons/General/' + oldIcons[Math.floor(Math.random() * oldIcons.length)]);
+            if (iconsInUse.length < iconMap["General"].length) {
+              while (iconsInUse.hasOwnProperty(iconURL)) {
+                iconURL = chrome.runtime.getURL('img/icons/General/' + oldIcons[Math.floor(Math.random() * oldIcons.length)]);
+              }
+            }
+          }
+          userIcons[userId] = iconURL;
+          iconsInUse.push(iconURL);
+          return userIcons[userId];
         }
       }
-  
+    
       var getUserNickname = function(userId, userNickname) {
-          if(userNicknames[userId]) {
+        if(userNicknames[userId]) {
+          return userNicknames[userId]
               return userNicknames[userId] 
-          } else {
-              if(userNickname) {
-                  userNicknames[userId] = userNickname;
-                  nicknamesInUse.push(userNickname);
+          return userNicknames[userId]
+        } else {
+          if(userNickname) {
+          userNicknames[userId] = userNickname;
+          nicknamesInUse.push(userNickname);
+          return userNicknames[userId];
                   return userNicknames[userId];    			
-              }
+          return userNicknames[userId];
           }
+        }
       }
-  
-      var logIcons = function() {
-        console.log("Icons in use: " + JSON.stringify(iconsInUse));
-        console.log("user Icons: " + JSON.stringify(userIcons));
-      }
-  
+    
+    
       // when user clicks on icon selector button, calls this function
       // if (saveToChrome) adds icon as userIcon to chrome storage (async)
       // adds userId: userIcon to userIcons map
@@ -725,27 +773,69 @@ var injectContentScript = function () {
       var setUserIcon = function(userId, userIcon, saveToChrome) {
         var userIcon = escapeStr(userIcon);
         var render = userIcons[userId];
-        if(saveToChrome) {
-          chrome.storage.local.set({"userIcon": userIcon}, function(data) {
-            if(chrome.runtime.lastError)
-            {
+      if(saveToChrome) {
+        if (userIcon.includes("/")) {
+          var iconName = userIcon.split("/")[1];
+          if (oldIcons.includes(iconName)) {
+            //Selected an old icon - use old icon
+            userIcon = `${iconName}?newIconUrl=${userIcon}`;
+            defaultIcon = iconName;
+          }else {
+            //Attach new icon as query
+            userIcon = `${defaultIcon}?newIconUrl=${userIcon}`;
+          }
+        }
+        chrome.storage.local.set({"userIcon": userIcon}, function(data) {
+          if(chrome.runtime.lastError)
+          {
+              /* error */
               console.log(chrome.runtime.lastError.message);
               return;
-            }
-            console.log('set user icon chrome storage data: ' + JSON.stringify(data));
+          }
+          console.log('set user icon chrome storage data: ' + JSON.stringify(data));
+          console.log('userIcon saved into settings chrome storage: ' + userIcon);
+        });
+        userSettings.userIcon = userIcon;
+        console.log('new user settings after set user icon: ' + JSON.stringify(userSettings));
+        socket.emit('broadcastUserSettings', { userSettings: userSettings }, function() {});
+      }
+      var iconURL = "";
     
-              console.log('userIcon saved into settings chrome storage: ' + userIcon);
-          });
-          userSettings.userIcon = userIcon;
-          console.log('new user settings after set user icon: ' + JSON.stringify(userSettings));
-          socket.emit('broadcastUserSettings', { userSettings: userSettings }, function() {});
+      if (userIcon.includes('?newIconUrl=')) {
+        var parsedIcon = userIcon.split('?newIconUrl=')[1];
+        var oldIcon = userIcon.split('?newIconUrl=')[0];
+        if (newIcons.includes(parsedIcon)) {
+          iconURL = chrome.runtime.getURL('img/icons/' + parsedIcon);
+        }else if(oldIcons.includes(oldIcon)) {
+          iconURL = chrome.runtime.getURL('img/icons/General/' + oldIcon);
         }
+      }else {
+        if (newIcons.includes(userIcon)) {
+          // Work with new icons that don't use the query for future versions
+          iconURL = chrome.runtime.getURL('img/icons/' + userIcon);
+        }else if(oldIcons.includes(userIcon)) {
+          // Work with Old version icons
+          iconURL = chrome.runtime.getURL('img/icons/General/' + userIcon);
+        }
+      }
     
-        var iconURL = chrome.runtime.getURL('img/' + userIcon);
-        userIcons[userId] = iconURL;
-        iconsInUse.push(iconURL);
-        logIcons();
+      if (iconURL == null) {
+        // Load default icon for user.
+        iconURL = chrome.runtime.getURL('img/icons/General/' + oldIcons[Math.floor(Math.random() * oldIcons.length)]);
+        if (iconsInUse.length < iconMap["General"].length) {
+          while (iconsInUse.hasOwnProperty(iconURL)) {
+            iconURL = chrome.runtime.getURL('img/icons/General/' + oldIcons[Math.floor(Math.random() * oldIcons.length)]);
+          }
+        }
+      }
+    
+      userIcons[userId] = iconURL;
+      iconsInUse.push(iconURL);
+      logIcons();
+      // if(render) {
+        // delete old iconUrl from icons in use
         renderSidebar();
+        // }
       }
     
   
@@ -867,51 +957,56 @@ var injectContentScript = function () {
         console.log('user Id promise called: ' + userId);
         return delayUntil(function() {
               return userId;
-            }, 5000)();
+            }, 25000)();
         }
   
-      var getChromeStorage = function() {
-        return function() {
-          return new Promise(function(resolve, reject) {
+        var getChromeStorage = function() {
+          return function() {
+            return new Promise(function(resolve, reject) {
           if(userSettings.userId && userSettings.userIcon) {
             resolve(userSettings);
           }
           chrome.storage.local.get(null, function(data) {
-          // data.userId = userId;
-          // permId = userId;
-
-          if(!data.userId) {
-            data.userId = userId;
-            permId = userId;
-          }
-    
-          console.log('icons:' + JSON.stringify(icons));
-          console.log('user icon:' + JSON.stringify(data.userIcon));
-          var userIconFix = !icons.includes(data.userIcon);
-          console.log('userIconFix: ' + userIconFix);
-    
-    
-    
-          console.log('get chrome storage finished userID: ' + userId);
-          console.log("get chrome storage finished: " + JSON.stringify(data));
-    
-          if(!userIconFix && data.userId && data.userIcon) {
-            userSettings = data
-          } else if(userIconFix || data.userId && !data.userIcon) {
-            var dataUserId = data.userId;
-            var newIcon = icons[Math.floor(Math.random() * icons.length)];
-    
-            // getUserIconURL(userId, newIcon);
-            userSettings = {'userId': dataUserId, 'userIcon': newIcon};
-            setUserIcon(userSettings.userId, userSettings.userIcon, true);
-            console.log("get chrome storage creating new icon: " + JSON.stringify(userSettings));
+            if(!data.userId) {
+              data.userId = userId;
+              permId = userId;
+            }
+      
+      
+            console.log('icons:' + JSON.stringify(oldIcons));
+            console.log('user icon:' + JSON.stringify(data.userIcon));
+            var userIconFix = false;
+            if (data.userIcon && data.userIcon.includes("?newIconUrl=")) {
+              //Make sure both parts of userId are valid.
+              userIconFix = !(newIcons.includes(data.userIcon.split("?newIconUrl=")[1]) && oldIcons.includes(data.userIcon.split("?newIconUrl=")[0]));
+            }else {
+              userIconFix = !oldIcons.includes(data.userIcon);
+            }
+            console.log('userIconFix: ' + userIconFix);
+      
+      
+      
+            console.log('get chrome storage finished userID: ' + userId);
+            console.log("get chrome storage finished: " + JSON.stringify(data));
+      
+            if(!userIconFix && data.userId && data.userIcon) {
+              userSettings = data
+              defaultIcon = data.userIcon.split("?newIconUrl=")[0];
+            } else if(userIconFix || data.userId && !data.userIcon) {
+              var dataUserId = data.userId;
+              var newIcon = defaultIcon;
+      
+              // getUserIconURL(userId, newIcon);
+              userSettings = {'userId': dataUserId, 'userIcon': newIcon};
+              setUserIcon(userSettings.userId, userSettings.userIcon, true);
+              console.log("get chrome storage creating new icon: " + JSON.stringify(userSettings));
+              resolve(userSettings);
+            }
             resolve(userSettings);
-          }
-          resolve(userSettings);
-        });
           });
-        };
-      }
+            });
+          };
+        }
       // getChromeStorage()();
   
       // respond to update settings from the server
@@ -992,8 +1087,8 @@ var injectContentScript = function () {
           }
     
     // Raymond's Styling Code
-   @import"https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap";body,html{font-size:16px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}*{box-sizing:border-box}h1,h2,h3,h4,h5,h6,a,p,ul,li,ol,button,body,html{padding:0em}h1,h2,h3,h4,h5,h6,a,p,ul,li,ol,button,body,html{margin:0em}ul,li,ol,a{text-decoration:none;list-style:none}input,button{border:none}h1,h2,h3,h4,h5,h6,p,span,body,html{user-select:text !important;cursor:auto !important}img{user-select:none !important}div,section,button,input,form,article{outline:none}a{display:block;width:fit-content}button,input,form,fieldset{background:none}button:hover{cursor:pointer}.r-m{margin:0 !important}.r-m-t{margin-top:0 !important}.r-p-t{padding-top:0 !important}.r-m-l{margin-left:0 !important}.r-p-l{padding-left:0 !important}.r-m-r{margin-right:0 !important}.r-p-r{padding-right:0 !important}.r-m-b{margin-bottom:0 !important}.r-p-b{padding-bottom:0 !important}.r-b-r{border-radius:0px !important}.r-boxshadow{box-shadow:none !important}:root{--patreon: #F96854;--base-red: #EF3E3A;--active-red: #ea0f0a;--base-blue: #4da9ff;--base-orange: #ff8d4c;--base-green: #24D154;--base-white: #FAFAFA;--white-5: #F0F0F0;--white-10: #DCDCDC;--white-15: #C8C8C8;--white-20: #B4B4B4;--white-25: #A0A0A0;--white-30: #8C8C8C;--white-35: #787878;--base-black: #191919;--black-5: #5A5A5A;--black-10: #464646;--black-15: #323232;--black-20: #282828;--black-25: #1e1e1e;--black-30: #0a0a0a}.base-white-bg{background-color:var(--base-white)}.white-5-bg{background-color:var(--white-5)}.white-10-bg{background-color:var(--white-10)}.white-15-bg{background-color:var(--white-15)}.white-20-bg{background-color:var(--white-20)}.white-25-bg{background-color:var(--white-25)}.white-30-bg{background-color:var(--white-30)}.white-35-bg{background-color:var(--white-35)}.base-black-bg{background-color:var(--base-black)}.black-5-bg{background-color:var(--black-5)}.black-10-bg{background-color:var(--black-10)}.black-15-bg{background-color:var(--black-15)}.black-20-bg{background-color:var(--black-20)}.black-25-bg{background-color:var(--black-25)}.black-30-bg{background-color:var(--black-30)}.black-35-bg{background-color:var(--black-35)}.base-red-bg{background-color:var(--base-red)}.active-red-bg{background-color:var(--active-red)}.base-orange-bg{background-color:var(--base-orange)}.base-blue-bg{background-color:var(--base-blue)}.base-green-bg{background-color:var(--base-green)}.patreon-bg{background-color:var(--patreon)}.txt-blue{color:var(--base-blue) !important}.txt-red{color:var(--base-red) !important}.txt-white{color:var(--base-white) !important}div,p,span,a,h1,h2,h3,h4,h5,h6,li,ul,button{word-wrap:break-word}:root{--regular: 400;--medium: 500;--semi-bold: 600;--bold: 700;--extra-bold: 800;--black: 900}.extension-title{font-family:"Poppins",sans-serif;font-weight:var(--medium);color:var(--base-red);font-size:16px;letter-spacing:.2px}.extension-txt{font-family:"Poppins",sans-serif;font-weight:var(--regular);color:var(--white-5);font-size:14px}.extension-txt-indicator{font-family:"Poppins",sans-serif;font-weight:var(--regular);color:var(--white-35);font-size:11px}.extension-description{font-family:"Poppins",sans-serif;font-weight:var(--medium);color:var(--white-10);font-size:13px}.extension-border-bot{border-bottom:1px solid var(--black-10)}.extension-border-top{border-top:1px solid var(--black-10)}.extension-btn{width:100%;margin-top:10px;background:var(--base-red);color:var(--base-white);padding:10px 0px;border-radius:2px;font-family:"Poppins",sans-serif;font-weight:var(--medium);transition:background .3s ease;display:flex;flex-flow:wrap row;justify-content:center}.extension-btn:hover{background:var(--active-red)}.extension-btn a{font-family:"Poppins",sans-serif;font-weight:var(--medium);color:var(--base-white)}::-webkit-scrollbar{width:2px}::-webkit-scrollbar-thumb{background:var(--base-red);border-radius:10px}#chat-wrapper{position:fixed;right:0;width:288px;height:100%;background:var(--base-black)}#chat-container{width:250px;height:100%;margin:0 auto;padding:12px 0px}#chat-menu-container{display:flex;flex-flow:wrap row;justify-content:space-between;align-items:center}#chat-menu-container #title h1{font-family:"Poppins",sans-serif;font-weight:var(--medium);color:var(--base-red);font-size:16px;letter-spacing:.5px}#chat-menu-container #function-user{display:flex;flex-flow:wrap row}#chat-menu-container #function-user #link-icon{display:flex;flex-flow:wrap row;align-items:center;padding-right:10px;cursor:pointer}#chat-menu-container #function-user #link-icon .chat-link{color:var(--base-white);width:18px;height:18px;transform:scale(1);transition:color .3s ease}#chat-menu-container #function-user #link-icon .chat-link:hover{color:var(--base-red);transform:scale(1.05)}#chat-menu-container #function-user #user-icon img{width:38px;height:38px;transform:scale(1);transition:transform .3s ease}#chat-menu-container #function-user #user-icon img:hover{transform:scale(1.05)}#chat-history-container{display:flex;flex-flow:wrap column;justify-content:flex-end;height:calc(100% - 140px)}#chat-history-container #chat-history{overflow:auto;width:100%;height:auto;padding-top:10px}#chat-history-container #chat-history .msg,#chat-history-container #chat-history .msg-container{display:flex;flex-flow:wrap row;justify-content:space-between;padding:5px 0px;align-items:center}#chat-history-container #chat-history .msg-container{align-items:flex-start}#chat-history-container #chat-history .msg .icon img,#chat-history-container #chat-history .msg .icon-name img,#chat-history-container #chat-history .msg-container .icon img,#chat-history-container #chat-history .msg-container .icon-name img{width:36px;height:36px}#chat-history-container #chat-history .msg .msg-txt,#chat-history-container #chat-history .msg-container .msg-txt{display:flex;flex-flow:wrap column;width:80%}#chat-history-container #chat-history .msg .message,#chat-history-container #chat-history .msg .message-system,#chat-history-container #chat-history .msg .message-txt,#chat-history-container #chat-history .msg-container .message,#chat-history-container #chat-history .msg-container .message-system,#chat-history-container #chat-history .msg-container .message-txt{width:80%}#chat-history-container #chat-history .msg .message h3,#chat-history-container #chat-history .msg .message-system h3,#chat-history-container #chat-history .msg .message-txt h3,#chat-history-container #chat-history .msg-container .message h3,#chat-history-container #chat-history .msg-container .message-system h3,#chat-history-container #chat-history .msg-container .message-txt h3{font-family:"Poppins",sans-serif;font-weight:var(--semi-bold);color:var(--base-white);font-size:14px}#chat-history-container #chat-history .msg .message p,#chat-history-container #chat-history .msg .message-system p,#chat-history-container #chat-history .msg .message-txt p,#chat-history-container #chat-history .msg-container .message p,#chat-history-container #chat-history .msg-container .message-system p,#chat-history-container #chat-history .msg-container .message-txt p{font-family:"Poppins",sans-serif;font-weight:var(--regular);font-size:14px}#chat-history-container #chat-history .msg .message-txt p,#chat-history-container #chat-history .msg-container .message-txt p{color:var(--white-5);word-break:break-word !important}#chat-history-container #chat-history .msg .message-system p,#chat-history-container #chat-history .msg-container .message-system p{color:var(--white-35);font-style:italic}#chat-input-container input{padding-top:5px;width:100%}#chat-input-container input:hover{cursor:auto !important}#chat-icon-container{display:flex;flex-flow:wrap column;padding-top:10px}#chat-icon-container #icon-title-container{padding-bottom:10px}#chat-icon-container #icon-holder{display:flex;flex-flow:wrap row}#chat-icon-container #icon-holder .image-button{width:25%;padding:1px 3.75px}#chat-icon-container #icon-holder .image-button .img-class{width:100%;height:100%;transform:scale(0.95);transition:transform .3s ease}#chat-icon-container #icon-holder .image-button .img-class:hover{transform:scale(1)}.setting,.setting-container{display:flex;flex-flow:wrap column;display:none}.setting-usericon{width:100%;display:flex;flex-flow:wrap row;justify-content:center;padding-top:10px}.setting-usericon img{width:80px;height:80px;transform:scale(1);transition:transform .3s ease}.setting-usericon img:hover{transform:scale(1.05)}.setting-nickname{margin-top:10px}.setting-nickname .nickname,.setting-nickname .nickname-input,.setting-nickname .nickname-wrap{width:100%}.setting-nickname .nickname-wrap{display:flex;flex-flow:wrap column}.setting-nickname .nickname-input{margin-top:5px}.setting-nickname .nickname-input input{border-radius:2px;padding:8px 10px;width:100%;background:var(--black-15)}.setting-nickname .nickname-input input:hover{cursor:auto !important}#presence-indicator{display:block;padding-bottom:5px;height:20px}#patreon,#patreon-link,#patreon-container{display:flex;flex-flow:wrap row;justify-content:space-between;align-items:center;width:100%}#patreon-container{padding-top:10px}#patreon-link img{border-radius:20px;width:130px}#teleparty-blog-container{display:flex;flex-flow:wrap row;padding-top:10px;z-index:10}#teleparty-blog-btn{display:flex;flex-flow:wrap row;align-items:center;justify-content:space-between;width:100%;height:40px}#teleparty-blog-btn img{height:32px}#teleparty-blog-btn p{font-family:"Poppins",sans-serif;font-weight:var(--medium);background:var(--base-red);color:var(--base-white);padding:10px 20px;border-radius:20px}#teleparty-blog-btn p:hover{cursor:pointer !important}/*# sourceMappingURL=style.min.css.map */
-    // Raymond's Styling Code
+  @import url(https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap);body,html{font-size:16px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}*{box-sizing:border-box}a,body,button,h1,h2,h3,h4,h5,h6,html,li,ol,p,ul{padding:0}a,body,button,h1,h2,h3,h4,h5,h6,html,li,ol,p,ul{margin:0}a,li,ol,ul{text-decoration:none;list-style:none}button,input{border:none}body,h1,h2,h3,h4,h5,h6,html,p,span{user-select:text!important;cursor:auto!important}img{user-select:none!important}article,button,div,form,input,section{outline:0}a{display:block;width:fit-content}button,fieldset,form,input{background:0 0}button:hover{cursor:pointer}.r-m{margin:0!important}.r-m-t{margin-top:0!important}.r-p-t{padding-top:0!important}.r-m-l{margin-left:0!important}.r-p-l{padding-left:0!important}.r-m-r{margin-right:0!important}.r-p-r{padding-right:0!important}.r-m-b{margin-bottom:0!important}.r-p-b{padding-bottom:0!important}.r-b-r{border-radius:0!important}.r-boxshadow{box-shadow:none!important}:root{--patreon:#f96854;--base-red:#ef3e3a;--active-red:#ea0f0a;--base-blue:#4da9ff;--base-orange:#ff8d4c;--base-green:#24d154;--base-white:#fafafa;--white-5:#f0f0f0;--white-10:#dcdcdc;--white-15:#c8c8c8;--white-20:#b4b4b4;--white-25:#a0a0a0;--white-30:#8c8c8c;--white-35:#787878;--base-black:#191919;--black-5:#5a5a5a;--black-10:#464646;--black-15:#323232;--black-20:#282828;--black-25:#1e1e1e;--black-30:#0a0a0a}.base-white-bg{background-color:var(--base-white)}.white-5-bg{background-color:var(--white-5)}.white-10-bg{background-color:var(--white-10)}.white-15-bg{background-color:var(--white-15)}.white-20-bg{background-color:var(--white-20)}.white-25-bg{background-color:var(--white-25)}.white-30-bg{background-color:var(--white-30)}.white-35-bg{background-color:var(--white-35)}.base-black-bg{background-color:var(--base-black)}.black-5-bg{background-color:var(--black-5)}.black-10-bg{background-color:var(--black-10)}.black-15-bg{background-color:var(--black-15)}.black-20-bg{background-color:var(--black-20)}.black-25-bg{background-color:var(--black-25)}.black-30-bg{background-color:var(--black-30)}.black-35-bg{background-color:var(--black-35)}.base-red-bg{background-color:var(--base-red)}.active-red-bg{background-color:var(--active-red)}.base-orange-bg{background-color:var(--base-orange)}.base-blue-bg{background-color:var(--base-blue)}.base-green-bg{background-color:var(--base-green)}.patreon-bg{background-color:var(--patreon)}.txt-blue{color:var(--base-blue)!important}.txt-red{color:var(--base-red)!important}.txt-white{color:var(--base-white)!important}a,button,div,h1,h2,h3,h4,h5,h6,li,p,span,ul{word-wrap:break-word}:root{--regular:400;--medium:500;--semi-bold:600;--bold:700;--extra-bold:800;--black:900}.extension-title{font-family:Poppins,sans-serif;font-weight:var(--medium);color:var(--base-red);font-size:16px;letter-spacing:.2px}.extension-txt{font-family:Poppins,sans-serif;font-weight:var(--regular);color:var(--white-15);font-size:14px}.extension-txt-indicator{font-family:Poppins,sans-serif;font-weight:var(--regular);color:var(--white-35);font-size:11px}.extension-description{font-family:Poppins,sans-serif;font-weight:var(--medium);color:var(--white-10);font-size:13px}.extension-border-bot{border-bottom:1px solid var(--black-10)}.extension-border-top{border-top:1px solid var(--black-10)}.extension-btn{width:100%;margin-top:10px;background:var(--base-red);color:var(--base-white);padding:10px 0;border-radius:2px;font-family:Poppins,sans-serif;font-weight:var(--medium);transition:background .3s ease;display:flex;flex-flow:wrap row;justify-content:center;font-size:14px}.extension-btn:hover{background:var(--active-red)}.extension-btn a{font-family:Poppins,sans-serif;font-weight:var(--medium);color:var(--base-white)}::-webkit-scrollbar{width:2px}::-webkit-scrollbar-thumb{background:var(--base-red);border-radius:10px}#chat-wrapper{position:fixed;right:0;width:288px;height:100%;background:var(--base-black)}#chat-container{width:250px;height:100%;margin:0 auto;padding:12px 0}#chat-container .chat-header-container-active{height:100%}#chat-menu-container{display:flex;flex-flow:wrap row;justify-content:space-between;align-items:center}#chat-menu-container #title h1{font-family:Poppins,sans-serif;font-weight:var(--medium);color:var(--base-red);font-size:16px;letter-spacing:.5px}#chat-menu-container #function-user{display:flex;flex-flow:wrap row}#chat-menu-container #function-user #link-icon{display:flex;flex-flow:wrap row;align-items:center;padding-right:10px;cursor:pointer}#chat-menu-container #function-user #link-icon .chat-link{color:var(--base-white);width:18px;height:18px;transform:scale(1);transition:color .3s ease}#chat-menu-container #function-user #link-icon .chat-link:hover{color:var(--base-red);transform:scale(1.05)}#chat-menu-container #function-user #user-icon img{width:38px;height:38px;transform:scale(1);transition:transform .3s ease}#chat-menu-container #function-user #user-icon img:hover{transform:scale(1.05)}#chat-history-container{display:flex;flex-flow:wrap column;justify-content:flex-end;height:calc(100% - 136px)}#chat-history-container #chat-history{overflow:auto;width:100%;height:auto;padding-top:10px}#chat-history-container #chat-history .msg,#chat-history-container #chat-history .msg-container{display:flex;flex-flow:wrap row;justify-content:space-between;padding:5px 0;align-items:center}#chat-history-container #chat-history .msg-container{align-items:flex-start}#chat-history-container #chat-history .msg .icon img,#chat-history-container #chat-history .msg .icon-name img,#chat-history-container #chat-history .msg-container .icon img,#chat-history-container #chat-history .msg-container .icon-name img{width:36px;height:36px}#chat-history-container #chat-history .msg .msg-txt,#chat-history-container #chat-history .msg-container .msg-txt{display:flex;flex-flow:wrap column;width:80%}#chat-history-container #chat-history .msg .message,#chat-history-container #chat-history .msg .message-system,#chat-history-container #chat-history .msg .message-txt,#chat-history-container #chat-history .msg-container .message,#chat-history-container #chat-history .msg-container .message-system,#chat-history-container #chat-history .msg-container .message-txt{width:80%}#chat-history-container #chat-history .msg .message h3,#chat-history-container #chat-history .msg .message-system h3,#chat-history-container #chat-history .msg .message-txt h3,#chat-history-container #chat-history .msg-container .message h3,#chat-history-container #chat-history .msg-container .message-system h3,#chat-history-container #chat-history .msg-container .message-txt h3{font-family:Poppins,sans-serif;font-weight:var(--semi-bold);color:var(--base-white);font-size:14px;line-height:1.2;letter-spacing:.2px}#chat-history-container #chat-history .msg .message p,#chat-history-container #chat-history .msg .message-system p,#chat-history-container #chat-history .msg .message-txt p,#chat-history-container #chat-history .msg-container .message p,#chat-history-container #chat-history .msg-container .message-system p,#chat-history-container #chat-history .msg-container .message-txt p{font-family:Poppins,sans-serif;font-weight:var(--regular);font-size:14px;line-height:normal}#chat-history-container #chat-history .msg .message-txt p,#chat-history-container #chat-history .msg-container .message-txt p{color:#fff;word-break:break-word!important;line-height:normal}#chat-history-container #chat-history .msg .message-system p,#chat-history-container #chat-history .msg-container .message-system p{color:var(--white-35);font-style:italic;line-height:normal}#chat-input-container input{padding-top:5px;width:100%}#chat-input-container input:hover{cursor:auto!important}#chat-icon-container{display:flex;flex-flow:wrap column;flex-flow:column;height:100%;padding-top:10px}#chat-icon-container #icon-title-container{padding-bottom:10px}#chat-icon-container #icon-holder{display:flex;flex-flow:wrap row}#chat-icon-container #icon-holder .image-button{width:25%;padding:1px 3.75px}#chat-icon-container #icon-holder .image-button .img-class{width:100%;height:100%;transform:scale(.95);transition:transform .3s ease}#chat-icon-container #icon-holder .image-button .img-class:hover{transform:scale(1)}#icon-holder-container{height:calc(100% - 74px);overflow:auto}.icon-holder-wrap{padding:10px 0}.icon-holder-wrap:first-child{padding:0}.icon-holder-wrap p{padding-bottom:5px}.setting,.setting-container{display:flex;flex-flow:wrap column;display:none}.setting-usericon{width:100%;display:flex;flex-flow:wrap row;justify-content:center;padding-top:10px}.setting-usericon img{width:80px;height:80px;transform:scale(1);transition:transform .3s ease}.setting-usericon img:hover{transform:scale(1.05)}.setting-nickname{margin-top:10px}.setting-nickname .nickname,.setting-nickname .nickname-input,.setting-nickname .nickname-wrap{width:100%}.setting-nickname .nickname-wrap{display:flex;flex-flow:wrap column}.setting-nickname .nickname-input{margin-top:5px}.setting-nickname .nickname-input input{border-radius:2px;padding:8px 10px;width:100%;background:var(--black-15)}.setting-nickname .nickname-input input:hover{cursor:auto!important}#presence-indicator{display:block;padding-bottom:5px;height:20px}#patreon,#patreon-container,#patreon-link{display:flex;flex-flow:wrap row;justify-content:space-between;align-items:center;width:100%}#patreon-container{padding-top:10px}#patreon-link img{border-radius:20px;width:130px}#teleparty-blog-container{display:flex;flex-flow:wrap row;padding-top:10px;z-index:10}#teleparty-blog-btn{display:flex;flex-flow:wrap row;align-items:center;justify-content:space-between;width:100%;height:36px}#teleparty-blog-btn img{height:32px}#teleparty-blog-btn p{display:flex;flex-flow:wrap row;align-items:center;font-family:Poppins,sans-serif;font-weight:var(--medium);background:var(--base-red);color:var(--base-white);padding:6px 20px;border-radius:20px;height:100%}#teleparty-blog-btn p:hover{cursor:pointer!important}
+   // Raymond's Styling Code
     
         </style>
     
@@ -1049,8 +1144,10 @@ var injectContentScript = function () {
                 </div>
                 <div id="icon-holder-container">
                   <div id="icon-holder-template">
-                    <ul id="icon-holder">
-                    </ul>
+                    <div id="icon-holder-wrap">
+                      <p class="extension-txt-indicator"></p>
+                      <ul id="icon-holder"></ul>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1445,6 +1542,7 @@ var injectContentScript = function () {
           jQuery("#chat-input-container").show();
           jQuery("#teleparty-blog-container").show();
           jQuery('#presence-indicator').show();
+          jQuery("#chat-header-container").removeClass("chat-header-container-active");
         } else {
           jQuery("#chat-icon-container").data('active', true);
           jQuery(".chat-settings-container").show();
@@ -1462,6 +1560,7 @@ var injectContentScript = function () {
         if(jQuery("#chat-icon-container").data('active')) {
           jQuery("#chat-icon-container").show();
           jQuery(".chat-settings-container").hide();
+          jQuery("#chat-header-container").addClass("chat-header-container-active");
         }
       };
   

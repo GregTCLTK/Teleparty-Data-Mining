@@ -76,6 +76,7 @@ chrome.runtime.onInstalled.addListener(function(details){
         _gaq.push(['_trackEvent', 'update: ' + details.previousVersion + ' -> ' + thisVersion, 'clicked']);
         logEvent('update-' + thisVersion); // 16 chars max
     }
+    
 });
 
 chrome.storage.onChanged.addListener(function(changes, areaName) {
@@ -162,6 +163,12 @@ try {
     // olduserId2 is id from data2, olduserId1 is from data1
   function resetUserId3(oldUserId2, oldUserId1) {
     var xhr = new XMLHttpRequest();
+    if(oldUserId1) {
+      queryParams = queryParams+'&oldUserId1='+oldUserId1;
+    }
+    queryParams = queryParams + '&oldUserId2='+oldUserId2;
+    console.log("query params: " + queryParams);
+
     xhr.onreadystatechange = function() {
       if (xhr.readyState == XMLHttpRequest.DONE) {
         var userId = xhr.responseText;
@@ -171,9 +178,9 @@ try {
 
           if(oldUserId1) {
             userIdSettings['oldUserId1'] = oldUserId1;
-            queryParams = queryParams+'&oldUserId1='+oldUserId1;
+            // queryParams = queryParams+'&oldUserId1='+oldUserId1;
           }
-          queryParams = queryParams + '&oldUserId2='+oldUserId2;
+          // queryParams = queryParams + '&oldUserId2='+oldUserId2;
           console.log("query params: " + queryParams);
 
           userIdSettings['date'] = date.toString();
@@ -185,6 +192,7 @@ try {
         }
       }
     }
+    console.log()
     xhr.open('GET', 'https://data3.netflixparty.com/create-userId'+queryParams, true);
     // xhr.open('GET', 'https://data3.netflixparty.com/reset-userId?oldUserId2='+oldUserId2+'&oldUserId1='+oldUserId1, true);
     xhr.send(null);
@@ -218,6 +226,26 @@ try {
   console.log("user auth error");
 }
 
+async function processIconsAsync(directory, iconMap) {
+  return new Promise((resolve,reject) => {
+    // Loops through a Category Folder and adds value in iconMap mapped to the Category
+    var dirReader = directory.createReader();
+    var name = directory.name;
+    var entries = [];
+    
+    dirReader.readEntries(function(results) {
+      if (results.length) {
+        for (var icon of results) {
+          entries = entries.concat(icon.name);
+        }
+        iconMap[name] = entries;
+        resolve();
+      }
+    }, function(error) {
+    });
+  });
+}
+
 chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
     console.log(sender.tab ? "from a content script:" + sender.tab.url : "from the extension");
@@ -228,6 +256,24 @@ chrome.runtime.onMessage.addListener(
       xmlhttp.send(JSON.stringify(request.summary));
 
       sendResponse({farewell: "goodbye"});
+    }else if(request.type == "getIconMap") {
+      //Parses the img/icons directory and returns a map of all icons to their category
+      var iconMap = {};
+      chrome.runtime.getPackageDirectoryEntry(async (root) => {
+        root.getDirectory(`img/icons/`,null,(dir) => {
+          var dirReader = dir.createReader();
+          dirReader.readEntries(async (results) => {
+            if (results.length) {
+              const iconPromises = results.map( async category => {
+                return processIconsAsync(category,iconMap);
+              }, (err) => {});
+              await Promise.all(iconPromises);
+              sendResponse(iconMap);
+            } else {}
+          },(err) => {});
+        });      
+      });
+      return true;
     }
   }
 );
