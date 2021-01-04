@@ -7,7 +7,9 @@
 // inject Google Analytics
 var _gaq = _gaq || [];
 _gaq.push(['_setAccount', 'UA-71812070-2']);
-_gaq.push(['_trackPageview']);
+// _gaq.push(['_trackPageview']); // change: don't track bg page views
+_gaq.push(['_setSampleRate', '2.5']); // only send events for 2.5% of traffic
+
 
 (function() {
   var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
@@ -46,7 +48,6 @@ function logEvent(eventType) {
 
         var xmlhttp = new XMLHttpRequest();   // new HttpRequest instance 
         // TODO: change to data3
-        // xmlhttp.open("POST", "https://data2.netflixparty.com/log-event");
         xmlhttp.open("POST", "https://data3.netflixparty.com/log-event");
         xmlhttp.setRequestHeader("Content-Type", "application/json");
         xmlhttp.send(JSON.stringify(data));
@@ -155,7 +156,7 @@ try {
         }
       }
     }
-    xhr.open('GET', 'https://data3.netflixparty.com/create-userId'+queryparams, true);
+    xhr.open('GET', 'https://data3.netflixparty.com/create-userId'+queryParams, true); // fix query Params
     xhr.send(null);
   }
 
@@ -213,10 +214,12 @@ try {
         }
         
       }
-      if(!data.recentlyUpdated) {
-        console.log("userId not recently updated 1 -> now resetting")
-        resetUserId(data.userId);
-      } else {
+      // removed reset user id call
+      // if(!data.recentlyUpdated) {
+      //   console.log("userId not recently updated 1 -> now resetting")
+      //   resetUserId(data.userId);
+      // } 
+      else {
         console.log("chrome storage local has user id: " + data.userId);
         chrome.runtime.setUninstallURL("https://www.netflixparty.com/uninstall?userId=" + data.userId);
       }

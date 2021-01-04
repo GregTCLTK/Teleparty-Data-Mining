@@ -170,7 +170,8 @@ function UserSite(urlString,id) {
 // inject Google Analytics
 var _gaq = _gaq || [];
 _gaq.push(['_setAccount', 'UA-71812070-2']);
-_gaq.push(['_trackPageview']);
+_gaq.push(['_trackPageview']); // todo: change to remove popup page views?
+_gaq.push(['_setSampleRate', '2.5']); // added sample rate
 
 (function() {
   var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
@@ -183,7 +184,7 @@ _gaq.push(['_trackPageview']);
 //////////////////////////////////////////////////////////////////////////
 chrome.runtime.onUpdateAvailable.addListener(function(details) {
   // console.log("updating to version " + details.version);
-  _gaq.push(['_trackEvent', 'auto-update ->' + details.version, 'clicked']);
+  // _gaq.push(['_trackEvent', 'auto-update ->' + details.version, 'clicked']); // changed not necessary to track auto updates twice
   chrome.runtime.reload();
 });
 
@@ -227,7 +228,7 @@ function logEvent(eventType, sessionId, serviceName) {
       console.log("event: " + JSON.stringify(data));
 
       var xmlhttp = new XMLHttpRequest();   // new HttpRequest instance 
-      xmlhttp.open("POST", "https://data.netflixparty.com/log-event");
+      xmlhttp.open("POST", "https://data3.netflixparty.com/log-event");
       xmlhttp.setRequestHeader("Content-Type", "application/json");
       xmlhttp.send(JSON.stringify(data));
     }    
