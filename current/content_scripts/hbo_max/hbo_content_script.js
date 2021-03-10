@@ -686,12 +686,82 @@ var injectContentScript = function () {
     // icon state
     // BUGFIX: fix content verification errors due to case insensitivity (https://groups.google.com/a/chromium.org/forum/#!searchin/chromium-extensions/%E2%80%9CThis$20extension$20may$20have$20been$20corrupted%E2%80%9D$20%7Csort:date/chromium-extensions/DrSVKXkPCSU/Zw4dg_4MBgAJ)
     var oldIcons = ["Batman.svg","DeadPool.svg", "CptAmerica.svg", "Wolverine.svg", "IronMan.svg", "Goofy.svg", "Alien.svg", "Mulan.svg", "Snow-White.svg", "Poohbear.svg", "Sailormoon.svg", "Sailor Cat.svg", "Pizza.svg", "Cookie.svg", "Chocobar.svg", "hotdog.svg", "Hamburger.svg", "Popcorn.svg", "IceCream.svg", "ChickenLeg.svg"]
+    
+    var enableIconsetFunctions = {
+      "General": function () {
+        return true;
+      },
+      "Christmas": function () {
+        // Between 12/1 - 12/31
+        return new Date().getMonth() === 11;
+      },
+      "Halloween": function () {
+        var date = new Date();
+        // Between 10/24 - 10/31
+        return date.getMonth() === 9 && date.getDate() >= 24;
+      },
+      "Thanksgiving": function () {
+        var date = new Date();
+        // between 11/18 - 11/28 in US
+        // between 10/8 - 10/14 in Canada
+        return (date.getMonth() === 10 && date.getDate() >= 18 && date.getDate() <= 28) || 
+          (date.getMonth() === 9 && date.getDate() >= 8 && date.getDate() <= 14);
+      },
+    };
 
-  var newIcons = ["General/Alien.svg","General/Batman.svg","General/ChickenLeg.svg","General/Chocobar.svg","General/Cookie.svg","General/CptAmerica.svg","General/DeadPool.svg","General/Goofy.svg","General/Hamburger.svg","General/hotdog.svg","General/IceCream.svg","General/IronMan.svg","General/Mulan.svg","General/Pizza.svg","General/Poohbear.svg","General/Popcorn.svg","General/Sailor Cat.svg","General/Sailormoon.svg","General/Snow-White.svg","General/Wolverine.svg","Christmas/angel.svg","Christmas/bell.svg","Christmas/box.svg","Christmas/cane.svg","Christmas/flake.svg","Christmas/gingerbread.svg","Christmas/gingerbread_F.svg","Christmas/gingerbread_M.svg","Christmas/gloves_blue.svg","Christmas/gloves_red.svg","Christmas/hat.svg","Christmas/ornament.svg","Christmas/raindeer.svg","Christmas/reef.svg","Christmas/santa_F.svg","Christmas/santa_M.svg","Christmas/snowglobe.svg","Christmas/snowman.svg","Christmas/sock.svg","Christmas/tree.svg"];
-  var iconMap = {"General":["Alien.svg","Batman.svg","ChickenLeg.svg","Chocobar.svg","Cookie.svg","CptAmerica.svg","DeadPool.svg","Goofy.svg","Hamburger.svg","hotdog.svg","IceCream.svg","IronMan.svg","Mulan.svg","Pizza.svg","Poohbear.svg","Popcorn.svg","Sailor Cat.svg","Sailormoon.svg","Snow-White.svg","Wolverine.svg"],"Christmas":["angel.svg","bell.svg","box.svg","cane.svg","flake.svg","gingerbread.svg","gingerbread_F.svg","gingerbread_M.svg","gloves_blue.svg","gloves_red.svg","hat.svg","ornament.svg","raindeer.svg","reef.svg","santa_F.svg","santa_M.svg","snowglobe.svg","snowman.svg","sock.svg","tree.svg"],};
-
-  // Pick a random old Icon to use with older versions.
-  var defaultIcon = oldIcons[Math.floor(Math.random() * oldIcons.length)];
+    var newIcons = [
+      "General/Alien.svg","General/Batman.svg","General/ChickenLeg.svg","General/Chocobar.svg",
+      "General/Cookie.svg","General/CptAmerica.svg","General/DeadPool.svg","General/Goofy.svg",
+      "General/Hamburger.svg","General/hotdog.svg","General/IceCream.svg","General/IronMan.svg",
+      "General/Mulan.svg","General/Pizza.svg","General/Poohbear.svg","General/Popcorn.svg",
+      "General/Sailor Cat.svg","General/Sailormoon.svg","General/Snow-White.svg","General/Wolverine.svg",
+      "Christmas/angel.svg","Christmas/bell.svg","Christmas/box.svg","Christmas/cane.svg",
+      "Christmas/flake.svg","Christmas/gingerbread.svg","Christmas/gingerbread_F.svg","Christmas/gingerbread_M.svg",
+      "Christmas/gloves_blue.svg","Christmas/gloves_red.svg","Christmas/hat.svg","Christmas/ornament.svg",
+      "Christmas/raindeer.svg","Christmas/reef.svg","Christmas/santa_F.svg","Christmas/santa_M.svg",
+      "Christmas/snowglobe.svg","Christmas/snowman.svg","Christmas/sock.svg","Christmas/tree.svg",
+      "Halloween/bats.svg","Halloween/candy_corn.svg","Halloween/cat_black.svg","Halloween/cat_white.svg",
+      "Halloween/coffin.svg","Halloween/eye_ball.svg","Halloween/face_angry.svg","Halloween/face_evil.svg",
+      "Halloween/face_silly.svg","Halloween/face_smile.svg","Halloween/frankenstein.svg","Halloween/ghost_F.svg",
+      "Halloween/ghost_M.svg","Halloween/gravestone.svg","Halloween/lollipop.svg","Halloween/moon.svg",
+      "Halloween/mummy.svg","Halloween/potion.svg","Halloween/pumpkin.svg","Halloween/pumpkin_witch.svg",
+      "Halloween/skull_brain.svg","Halloween/skull_candy.svg","Halloween/skull_girl.svg","Halloween/witch_hat.svg",
+      "Thanksgiving/acorn.svg","Thanksgiving/bread.svg","Thanksgiving/candles.svg","Thanksgiving/corn.svg",
+      "Thanksgiving/drinks.svg","Thanksgiving/maple_leaf.svg","Thanksgiving/plate_chicken.svg","Thanksgiving/pumpkin.svg",
+      "Thanksgiving/pumpkin_pie.svg","Thanksgiving/slice_pie.svg","Thanksgiving/sun_flower.svg","Thanksgiving/turkey_face.svg"
+    ];
+    var iconMap = {
+      "General": [
+        "Alien.svg","Batman.svg","ChickenLeg.svg","Chocobar.svg",
+        "Cookie.svg","CptAmerica.svg","DeadPool.svg","Goofy.svg",
+        "Hamburger.svg","hotdog.svg","IceCream.svg","IronMan.svg",
+        "Mulan.svg","Pizza.svg","Poohbear.svg","Popcorn.svg",
+        "Sailor Cat.svg","Sailormoon.svg","Snow-White.svg","Wolverine.svg"
+      ],
+      "Christmas": [
+        "angel.svg","bell.svg","box.svg","cane.svg",
+        "flake.svg","gingerbread.svg","gingerbread_F.svg","gingerbread_M.svg",
+        "gloves_blue.svg","gloves_red.svg","hat.svg","ornament.svg",
+        "raindeer.svg","reef.svg","santa_F.svg","santa_M.svg",
+        "snowglobe.svg","snowman.svg","sock.svg","tree.svg"
+      ],
+      "Halloween": [
+        "bats.svg", "candy_corn.svg", "cat_black.svg", "cat_white.svg",
+        "coffin.svg", "eye_ball.svg", "face_angry.svg", "face_evil.svg",
+        "face_silly.svg", "face_smile.svg", "frankenstein.svg", "ghost_F.svg",
+        "ghost_M.svg", "gravestone.svg", "lollipop.svg", "moon.svg",
+        "mummy.svg", "potion.svg", "pumpkin.svg", "pumpkin_witch.svg",
+        "skull_brain.svg", "skull_candy.svg", "skull_girl.svg", "witch_hat.svg"
+      ],
+      "Thanksgiving": [
+        "acorn.svg", "bread.svg", "candles.svg", "corn.svg", 
+        "drinks.svg", "maple_leaf.svg", "plate_chicken.svg", "pumpkin.svg",
+        "pumpkin_pie.svg", "slice_pie.svg", "sun_flower.svg", "turkey_face.svg"
+      ],
+    };
+    
+    // Pick a random old Icon to use with older versions.
+    var defaultIcon = oldIcons[Math.floor(Math.random() * oldIcons.length)];
     var iconsInUse = [];
     var userIcons = {};
 
@@ -722,6 +792,7 @@ var injectContentScript = function () {
   
     var addIconSelector = function() {
       Object.keys(iconMap).forEach(function (categoryName) {
+        if (enableIconsetFunctions[categoryName]()) {
           var icons = iconMap[categoryName];
           var iconHolder = jQuery(`
             <ul id="icon-holder"></ul>
@@ -736,6 +807,7 @@ var injectContentScript = function () {
           `)
           iconHolder.appendTo(categorySection);
           categorySection.appendTo(jQuery('#icon-holder-template'));
+        }
       });
     }
   
