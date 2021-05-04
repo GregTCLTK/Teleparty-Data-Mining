@@ -14,7 +14,7 @@
    "content_security_policy": "script-src 'self' https://ssl.google-analytics.com; object-src 'self'",
    "default_locale": "en",
    "description": "__MSG_extDescription__",
-   "differential_fingerprint": "1.665082fcdd4eb5923f771368e573e2ad3e8f3ae619929d0bf94e077284ef2a19",
+   "differential_fingerprint": "1.26f11cae30bca6af867d509d4eef1baa5fc13a45f465fc553328832e2a5a1c73",
    "icons": {
       "128": "icon.png",
       "16": "icon.png",
@@ -25,6 +25,6 @@
    "name": "__MSG_extName__",
    "permissions": [ "activeTab", "storage" ],
    "update_url": "https://clients2.google.com/service/update2/crx",
-   "version": "2.0.5",
+   "version": "2.0.6",
    "web_accessible_resources": [ "img/*.svg", "web/*" ]
 }
