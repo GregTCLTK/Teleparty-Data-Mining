@@ -997,7 +997,7 @@
                             }, loadSessionMessage = new LoadSessionMessage("Service_Background", "Content_Script", loadSessionData);
                             await sendMessageToTabAsync(tabId, loadSessionMessage);
                             return logEventAsync({
-                                eventType: "create-session",
+                                eventType: "create-session-chrome",
                                 sessionId: callbackData.sessionId
                             }), increaseUsesAsync(), {
                                 sessionId: callbackData.sessionId,
@@ -1054,7 +1054,7 @@
                                         }, loadSessionMessage = new LoadSessionMessage("Service_Background", "Content_Script", loadSessionData);
                                         await sendMessageToTabAsync(tabId, loadSessionMessage);
                                         return logEventAsync({
-                                            eventType: "join-session",
+                                            eventType: "join-session-chrome",
                                             sessionId: callbackData.sessionId
                                         }), increaseUsesAsync(), {
                                             sessionId: callbackData.sessionId,

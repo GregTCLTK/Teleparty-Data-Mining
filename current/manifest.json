@@ -13,7 +13,7 @@
    "content_security_policy": "script-src 'self' https://ssl.google-analytics.com 'unsafe-eval'; object-src 'self'",
    "default_locale": "en",
    "description": "__MSG_extDescription__",
-   "differential_fingerprint": "1.c85c655dac1d755972a999170e9ba9601e3cb89e7300ea6532ddafa2be3592b4",
+   "differential_fingerprint": "1.e6c6ecf9f579e271f91f577b1ca9a0707355a487c89a1e929b8d01b735904cc2",
    "icons": {
       "128": "img/icon.png",
       "16": "img/icon.png",
@@ -24,6 +24,6 @@
    "name": "__MSG_extName__",
    "permissions": [ "activeTab", "storage" ],
    "update_url": "https://clients2.google.com/service/update2/crx",
-   "version": "3.0.1",
+   "version": "3.0.2",
    "web_accessible_resources": [ "img/*.svg", "web/*", "content_scripts/hbo_max/hbo_max_injected_bundled.js", "content_scripts/hbo_now/hbo_now_injected_bundled.js", "content_scripts/amazon/amazon_injected_bundled.js", "content_scripts/hulu/hulu_injected_bundled.js", "content_scripts/netflix/netflix_injected_bundled.js", "content_scripts/disney/disney_injected_bundled.js" ]
 }

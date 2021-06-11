@@ -367,23 +367,30 @@
             }));
         }().then((async activeTab => {
             {
-                var _activeTab$id;
+                var _activeTab$id, _activeTab$url;
                 const tabId = null !== (_activeTab$id = activeTab.id) && void 0 !== _activeTab$id ? _activeTab$id : 0;
                 console.log("Tab id: " + activeTab.id);
-                if (!await function(tabId) {
+                const tabUrl = new URL(null !== (_activeTab$url = activeTab.url) && void 0 !== _activeTab$url ? _activeTab$url : "");
+                let loadOldScript = await function(tabId) {
                     return new Promise((resolve => {
-                        chrome.storage.local.get("newScriptMap", (res => {
-                            const newScriptMap = res.newScriptMap;
-                            resolve(newScriptMap && void 0 !== newScriptMap[tabId]);
+                        chrome.storage.local.get("oldScriptMap", (res => {
+                            const oldScriptMap = res.oldScriptMap;
+                            resolve(oldScriptMap && void 0 !== oldScriptMap[tabId]);
                         }));
                     }));
-                }(tabId)) throw stopSpinning(), runOldPopupScript(), new Error;
+                }(tabId);
+                if (Services_Amazon.isValidUrl(tabUrl) && (loadOldScript = !1), loadOldScript) throw stopSpinning(), 
+                runOldPopupScript(), new Error;
             }
             return activeTab;
         })).then((activeTab => {
             let extensionTab;
-            if (debug("hi up"), !activeTab.url || !activeTab.id) return $(".wrongSite").removeClass("hidden"), 
-            void $(".disconnected").addClass("hidden");
+            if (debug("Setting up popup event listeners"), $("#create-session").click(createSessionAsync), 
+            $("#close-error").click(closeErrorClicked), $("#reviewLink").click(reviewLinkClicked), 
+            $("#learn-more").click(learnMore), $("#learn-more-teleparty").click(learnMoreTeleparty), 
+            $("#leave-session").click(leaveSessionAsync), $("#show-chat").change(showChat), 
+            $("#share-url").click(onShareUrlClicked), $("#copy-btn").click(onCopybuttonClicked), 
+            !activeTab.url || !activeTab.id) return $(".wrongSite").removeClass("hidden"), void $(".disconnected").addClass("hidden");
             {
                 const url = new URL(activeTab.url);
                 if (extensionTab = new ExtensionTab(url, activeTab.id), !extensionTab.serviceName) return !function(url) {
@@ -404,8 +411,8 @@
                             response.showReviewMessage;
                         }
                         stopSpinning();
-                    }(), setupEventListeners(), debug("Content Script Ready"), sendResponse(), Messaging_MessagePasser.removeListener(onMessage)) : message.type === ClientMessageType.CONTENT_SCRIPT_ERROR && (showError(message.data.message, message.data.showButton), 
-                    stopSpinning(), setupEventListeners(), sendResponse(), Messaging_MessagePasser.removeListener(onMessage)));
+                    }(), debug("Content Script Ready"), sendResponse(), Messaging_MessagePasser.removeListener(onMessage)) : message.type === ClientMessageType.CONTENT_SCRIPT_ERROR && (showError(message.data.message, message.data.showButton), 
+                    stopSpinning(), sendResponse(), Messaging_MessagePasser.removeListener(onMessage)));
                     return !1;
                 })), initContentScriptsAsync().then((async function() {
                     const isContentScriptReadyMessage = new IsContentSriptReadyMessage("Popup", "Content_Script");
@@ -418,13 +425,6 @@
             function showConnected(partyUrl) {
                 $(".disconnected").addClass("hidden"), $(".connected").removeClass("hidden"), $("#show-chat").prop("checked", !0), 
                 $("#share-url").val(partyUrl).focus().select();
-            }
-            function setupEventListeners() {
-                debug("Setting up popup event listeners"), $("#create-session").click(createSessionAsync), 
-                $("#close-error").click(closeErrorClicked), $("#reviewLink").click(reviewLinkClicked), 
-                $("#learn-more").click(learnMore), $("#learn-more-teleparty").click(learnMoreTeleparty), 
-                $("#leave-session").click(leaveSessionAsync), $("#show-chat").change(showChat), 
-                $("#share-url").click(onShareUrlClicked), $("#copy-btn").click(onCopybuttonClicked);
             }
             async function createSessionAsync() {
                 startSpinning(), await initContentScriptsAsync(), await delay(500)(), debug("Sending create session");
