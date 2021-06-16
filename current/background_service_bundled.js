@@ -485,7 +485,10 @@
             debug("User id:  " + userId), null == this._userId && (this._userId = userId);
         }
         teardown() {
-            this._socket.close(4500), this._userId = "", this._keepAlive && clearInterval(this._keepAlive);
+            try {
+                this._socket.close(4500);
+            } catch (e) {}
+            this._userId = "", this._keepAlive && clearInterval(this._keepAlive);
         }
         sendMessage(type, data, callback) {
             if (1 == this._socket.readyState) {
@@ -515,7 +518,7 @@
                             return condition() ? Promise.resolve(result) : null !== maxDelay && (new Date).getTime() - startTime > maxDelay ? Promise.reject(new Error("delayUntil timed out" + condition)) : delay(delayStep)().then(checkForCondition);
                         }();
                     };
-                }((() => null != this._userId), 5e3)(), null !== (_this$_userId = this._userId) && void 0 !== _this$_userId ? _this$_userId : "";
+                }((() => null != this._userId), 2e4)(), null !== (_this$_userId = this._userId) && void 0 !== _this$_userId ? _this$_userId : "";
             } catch (error) {
                 throw new Error("Could not get a response from the socket in time. Please refresh the page and try again.");
             }
@@ -1178,9 +1181,13 @@
     chrome.runtime.onConnect.addListener((port => {
         var _port$sender, _port$sender$tab;
         const tabId = null === (_port$sender = port.sender) || void 0 === _port$sender || null === (_port$sender$tab = _port$sender.tab) || void 0 === _port$sender$tab ? void 0 : _port$sender$tab.id;
-        tabId && (debug("Connected to Content Script with Tab ID: " + tabId), port.postMessage("pong"), 
-        port.onDisconnect.addListener((() => {
-            onTabClosed(tabId);
-        })));
+        if (tabId) {
+            debug("Connected to Content Script with Tab ID: " + tabId);
+            try {
+                port.postMessage("pong"), port.onDisconnect.addListener((() => {
+                    onTabClosed(tabId);
+                }));
+            } catch (e) {}
+        }
     })), new BackgroundSocketMessageForwarder, debug("Service Background");
 })();
