@@ -118,7 +118,7 @@
                 return match && match.length > 0 ? match[1] : void 0;
             }
             getFullscreenScript() {
-                return "document.getElementsByClassName(\"sizing-wrapper\")[0].requestFullscreen = function() {}\n                console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                    console.log('fullscreen click');\n                    var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                    fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                }\n        ";
+                return "\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                    console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                    document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                        console.log('fullscreen click');\n                        var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                        fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                    }\n                } \n        ";
             }
         }([], [ "content_scripts/netflix/netflix_content_bundled.js" ], "netflix", StreamingServiceName.NETFLIX, !1);
         Object.freeze(Netflix);
@@ -236,7 +236,8 @@
                     time
                 }, "*");
                 try {
-                    await delay(250)(), await this._hideControls();
+                    await delay(250)(), await delayUntil((() => this.getPlaybackState() !== PlaybackState.LOADING), 1 / 0), 
+                    await this._hideControls();
                 } finally {
                     this._uiEventsHappening -= 1;
                 }
@@ -257,7 +258,8 @@
                     pageY: 100,
                     currentTarget: player[0]
                 };
-                return player[0].dispatchEvent(new MouseEvent("mousemove", eventOptions)), delay(1)().finally((() => {
+                return player.length > 0 ? player[0].dispatchEvent(new MouseEvent("mousemove", eventOptions)) : console.warn("Couldn't find player to hide controls"), 
+                delay(1)().finally((() => {
                     this._uiEventsHappening -= 1;
                 }));
             }
@@ -333,21 +335,22 @@
             content: "It looks like you lost connection to the extension. Click the button below to be redirected to the party, then click on the red Tp icon to rejoin.",
             buttonTitle: "Return to Party"
         };
-        function showButtonMessage(options, redirectUrl) {
+        function showButtonMessage(options, buttonUrl) {
             hideAlertMessages();
-            const modalTemplate = redirectUrl ? function(options) {
+            const modalTemplate = buttonUrl ? function(options) {
                 return `\n    <div id="alert-dialog-wrapper">\n      <div id="alert-dialog-container">\n        <div id="alert-title-wrapper">\n            <div class="alert-title">\n                <p id="alert-title-txt" class="extension-title">\n                    ${options.title}\n                </p>\n                <button id="alert-x-btn">\n                    <img src="${closeImage}" alt="close" />\n                </button>\n            </div>\n            <div class="extension-border-bot">\n                \n            </div>\n        </div>\n        <div id="alert-description">\n            <p id="alert-content-txt" class="extension-txt">\n              ${options.content}\n            </p>\n            <button id="alert-return-btn" class="extension-btn">${options.buttonTitle}</button>\n        </div>\n      </div>\n    </div>\n    `;
             }(options) : function(options) {
                 return `\n  <div id="alert-dialog-wrapper">\n    <div id="alert-dialog-container">\n      <div id="alert-title-wrapper">\n          <div class="alert-title">\n              <p id="alert-title-txt" class="extension-title">\n                  ${options.title}\n              </p>\n              <button id="alert-x-btn">\n                  <img src="${closeImage}" alt="close" />\n              </button>\n          </div>\n          <div class="extension-border-bot">\n              \n          </div>\n      </div>\n      <div id="alert-description">\n          <p id="alert-content-txt" class="extension-txt">\n            ${options.content}\n          </p>\n      </div>\n    </div>\n  </div>\n  `;
             }(options);
             document.body.insertAdjacentHTML("afterbegin", modalTemplate), jQuery("#alert-x-btn").click((() => {
                 hideAlertMessages();
-            })), jQuery("#alert-return-btn").click((() => {
-                hideAlertMessages(), window.location.href = redirectUrl;
+            })), buttonUrl && jQuery("#alert-return-btn").click((() => {
+                hideAlertMessages(), window.location.href = buttonUrl;
             }));
         }
         function hideAlertMessages() {
-            document.querySelector("#alert-dialog-wrapper") && document.querySelector("#alert-dialog-wrapper").remove();
+            const alertWrapper = document.querySelector("#alert-dialog-wrapper");
+            alertWrapper && alertWrapper.remove();
         }
         const DEFAULT_TEARDOWN = {
             showAlert: !1
@@ -480,7 +483,7 @@
                 this._chatApi = chatApi;
             }
             onIdleWarning() {
-                debug("Idle Warning called"), showButtonMessage(idleWarningModal, void 0), this._idleKickTimeout = setTimeout(this.onIdleTimeout.bind(this), 6e4);
+                debug("Idle Warning called"), showButtonMessage(idleWarningModal), this._idleKickTimeout = setTimeout(this.onIdleTimeout.bind(this), 6e4);
             }
             onIdleTimeout() {
                 debug("Idle kick called");
@@ -653,7 +656,7 @@
             getUserNickname(userId) {
                 let userNickname = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : "";
                 return this._userNicknames.has(userId) || (this._userNicknames.set(userId, userNickname), 
-                this._nicknamesInUse.push(userNickname)), this._userNicknames.get(userId);
+                this._nicknamesInUse.push(userNickname)), escapeStr(this._userNicknames.get(userId));
             }
             _getDefaultIconUrl() {
                 let iconURL = chrome.runtime.getURL("img/icons/General/" + oldIcons[Math.floor(Math.random() * oldIcons.length)]);
@@ -703,7 +706,8 @@
                 this._userIcons.set(userId, iconUrl), this._iconsInUse.push(iconUrl), this.renderSidebar();
             }
             setUserNickname(userId, userNickname) {
-                this._userNicknames.set(userId, userNickname), this._nicknamesInUse.push(userNickname), 
+                const escapedUserNickName = escapeStr(userNickname);
+                this._userNicknames.set(userId, escapedUserNickName), this._nicknamesInUse.push(escapedUserNickName), 
                 this.renderSidebar();
             }
             updateUserData(userId, userIcon, userNickname) {
@@ -843,6 +847,14 @@
             }) : obj[key] = value, obj;
         }
         var css_alert = __webpack_require__(39), css_chat = __webpack_require__(644);
+        function NetflixChatApi_defineProperty(obj, key, value) {
+            return key in obj ? Object.defineProperty(obj, key, {
+                value,
+                enumerable: !0,
+                configurable: !0,
+                writable: !0
+            }) : obj[key] = value, obj;
+        }
         class NetflixChatApi extends class {
             constructor() {
                 ChatApi_defineProperty(this, "_chatEventListener", void 0), ChatApi_defineProperty(this, "_chatPresenceController", void 0), 
@@ -861,6 +873,10 @@
                 this._isChatInjected() && this.removeChat(), this._setChatHtml(), this._injectChat(), 
                 this.setChatVisible(!0), this.addIconSelector(), this._startEventListener(), this._chatPresenceController.setupPresenceIndicator(), 
                 this._inSession = !0;
+            }
+            sendTeardown(teardownData) {
+                const teardownMessage = new TeardownMessage("Content_Script", "Service_Background", teardownData);
+                Messaging_MessagePasser.sendMessageToExtension(teardownMessage);
             }
             _isChatInjected() {
                 return jQuery("#chat-wrapper").length > 0;
@@ -1021,40 +1037,45 @@
             }
         } {
             constructor() {
-                var obj, key, value;
-                super(), value = void 0, (key = "_shouldChatBeVisible") in (obj = this) ? Object.defineProperty(obj, key, {
-                    value,
-                    enumerable: !0,
-                    configurable: !0,
-                    writable: !0
-                }) : obj[key] = value, this._shouldChatBeVisible = !1;
+                super(), NetflixChatApi_defineProperty(this, "_shouldChatBeVisible", void 0), NetflixChatApi_defineProperty(this, "chatWrapper", void 0), 
+                this._shouldChatBeVisible = !1;
             }
             _injectChat() {
                 if (this._chatHtml) {
                     const sizingWrapper = jQuery(".sizing-wrapper");
-                    if (sizingWrapper.after(function(chatHtml) {
-                        return `\n    <style>\n      ${css_alert}\n    </style>\n    \n    <style tpInjected>\n      #chat-wrapper {\n        width: 288px !important;\n        height: 100% !important;\n        background: #1a1a1a;\n        position: fixed !important;\n        top: 0 !important;\n        left: auto !important;\n        right: 0 !important;\n        bottom: 0 !important;\n        cursor: auto;\n        user-select: text;\n        -webkit-user-select: text;\n        z-index: 9999999999 !important;\n      }\n\n      .with-chat {\n        left: 0px !important;\n        // right: 288px !important;\n        width: calc(100% - 288px) !important;\n      }\n\n      ${arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : ""}\n    \n      ${css_chat}\n      \n    </style>\n\n    ${chatHtml}\n  `;
-                    }(this._chatHtml)), 0 == sizingWrapper.length || jQuery(".ltr-fntwn3").length > 0) return void showButtonMessage(testParticipationModal, "https://www.netflix.com/donottest");
-                    injectScriptText(Services_Netflix.getFullscreenScript()), sizingWrapper.addClass("with-chat");
+                    if (!(sizingWrapper.length > 0)) {
+                        const teardownData = {
+                            showAlert: !0,
+                            alertModal: testParticipationModal,
+                            buttonUrl: "https://www.netflix.com/donottest"
+                        };
+                        return document.body.after(`\n  <style>\n    ${css_alert}\n  </style>\n  `), void this.sendTeardown(teardownData);
+                    }
+                    this.chatWrapper = sizingWrapper, this.chatWrapper.after(function(chatHtml) {
+                        return `\n    <style>\n      ${css_alert}\n    </style>\n\n    <style tpInjected>\n      #chat-wrapper {\n        width: 288px !important;\n        height: 100% !important;\n        background: #1a1a1a;\n        position: fixed !important;\n        top: 0 !important;\n        left: auto !important;\n        right: 0 !important;\n        bottom: 0 !important;\n        cursor: auto;\n        user-select: text;\n        -webkit-user-select: text;\n        z-index: 9999999999 !important;\n      }\n\n      .with-chat {\n        left: 0px !important;\n        // right: 288px !important;\n        width: calc(100% - 288px) !important;\n      }\n\n      ${arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : ""}\n    \n      ${css_chat}\n      \n    </style>\n\n    ${chatHtml}\n  `;
+                    }(this._chatHtml)), injectScriptText(Services_Netflix.getFullscreenScript()), this.chatWrapper.addClass("with-chat");
                 }
             }
             removeChat() {
-                super.removeChat(), jQuery(".sizing-wrapper").removeClass("with-chat");
+                var _this$chatWrapper;
+                super.removeChat(), null === (_this$chatWrapper = this.chatWrapper) || void 0 === _this$chatWrapper || _this$chatWrapper.removeClass("with-chat");
             }
             getChatVisible() {
-                return jQuery(".sizing-wrapper").hasClass("with-chat");
+                var _this$chatWrapper$has, _this$chatWrapper2;
+                return null !== (_this$chatWrapper$has = null === (_this$chatWrapper2 = this.chatWrapper) || void 0 === _this$chatWrapper2 ? void 0 : _this$chatWrapper2.hasClass("with-chat")) && void 0 !== _this$chatWrapper$has && _this$chatWrapper$has;
             }
             setChatVisible(visible) {
-                this._shouldChatBeVisible = visible, visible ? (jQuery(".sizing-wrapper").addClass("with-chat"), 
+                var _this$chatWrapper3, _this$chatWrapper4;
+                (this._shouldChatBeVisible = visible, visible) ? (null === (_this$chatWrapper3 = this.chatWrapper) || void 0 === _this$chatWrapper3 || _this$chatWrapper3.addClass("with-chat"), 
                 jQuery("#chat-wrapper").show(), document.hasFocus() || this.clearUnreadCount()) : (jQuery("#chat-wrapper").hide(), 
-                jQuery(".sizing-wrapper").removeClass("with-chat"));
+                null === (_this$chatWrapper4 = this.chatWrapper) || void 0 === _this$chatWrapper4 || _this$chatWrapper4.removeClass("with-chat"));
             }
         }
         let PopupMessageType, ChatApiMessageType, VideoApiMessageType;
         !function(PopupMessageType) {
             PopupMessageType.CREATE_SESSION = "createSession", PopupMessageType.GET_INIT_DATA = "getInitData", 
             PopupMessageType.IS_CONTENT_SCRIPT_READY = "isContentScriptReady", PopupMessageType.SET_CHAT_VISIBLE = "setChatVisible", 
-            PopupMessageType.DISCONNECT = "teardown";
+            PopupMessageType.DISCONNECT = "teardown", PopupMessageType.CLOSE_POPUP = "closePopup";
         }(PopupMessageType || (PopupMessageType = {}));
         class ContentScriptReadyMessage extends ClientMessage {
             constructor(sender, target) {
@@ -1714,9 +1735,7 @@
             replaceStateInteraction(event) {
                 if (event.source == window) if ("FROM_PAGE_POP" !== event.data.type) {
                     if (event.data.type && "FROM_PAGE" == event.data.type) {
-                        debug("***********************************"), debug("Content script received: " + event.data.text);
-                        const episodePage = window.location.href.match(/^.*\/(watch)\/.*/);
-                        if (debug(window.location.href), episodePage) {
+                        if (window.location.href.match(/^.*\/(watch)\/.*/)) {
                             var _this$_videoMessageFo3;
                             const nextVideoId = Services_Netflix.getVideoId(new URL(window.location.href));
                             if (!nextVideoId) return debug("No video found. Tearing down"), void this._onTeardown(DEFAULT_TEARDOWN);
@@ -1776,7 +1795,11 @@
                 return !1;
             }
             _teardown(data) {
-                data.showAlert && showButtonMessage(data.alertModal, this._chatApi.getPartyUrl()), 
+                if (data.showAlert && data.alertModal) {
+                    var _data$buttonUrl;
+                    const buttonUrl = null !== (_data$buttonUrl = data.buttonUrl) && void 0 !== _data$buttonUrl ? _data$buttonUrl : this._chatApi.getPartyUrl();
+                    showButtonMessage(data.alertModal, buttonUrl);
+                }
                 this._videoMessageForwarder.teardown(), this._chatMessageForwarder.teardown(), this._messageReceiver.teardown(), 
                 window.telepartyLoaded = !1;
             }

@@ -16,7 +16,7 @@
             });
             window.dispatchEvent(evt);
         } else e.data.type && "teardown" == e.data.type ? (window.removeEventListener("message", seekInteraction, !1), 
-        window.seekScriptLoaded = !1) : e.data.type && "NEXT_EPISODE" == e.data.type && function() {
+        window.seekScriptLoaded = !1) : e.data.type && "NEXT_EPISODE" == e.data.type ? function() {
             var controlsRoot = document.querySelector(".PlayerControlsNeo__button-control-row");
             if (null == controlsRoot) return null;
             for (var keys = Object.keys(controlsRoot), key = null, i = 0; i < keys.length; i++) if (keys[i].startsWith("__reactInternalInstance")) {
@@ -30,6 +30,6 @@
             return null;
         }().stateNode.props.player._coreComponent.props.playNextTitle({
             videoId: parseInt(e.data.videoId)
-        });
+        }) : e.data.type && "Pause" === e.data.type ? getVideoPlayer().pause() : e.data.type && "Play" === e.data.type && getVideoPlayer().play();
     }), !1);
 })();

@@ -50,21 +50,22 @@
             content: "It looks like you lost connection to the extension. Click the button below to be redirected to the party, then click on the red Tp icon to rejoin.",
             buttonTitle: "Return to Party"
         };
-        function showButtonMessage(options, redirectUrl) {
+        function showButtonMessage(options, buttonUrl) {
             hideAlertMessages();
-            const modalTemplate = redirectUrl ? function(options) {
+            const modalTemplate = buttonUrl ? function(options) {
                 return `\n    <div id="alert-dialog-wrapper">\n      <div id="alert-dialog-container">\n        <div id="alert-title-wrapper">\n            <div class="alert-title">\n                <p id="alert-title-txt" class="extension-title">\n                    ${options.title}\n                </p>\n                <button id="alert-x-btn">\n                    <img src="${closeImage}" alt="close" />\n                </button>\n            </div>\n            <div class="extension-border-bot">\n                \n            </div>\n        </div>\n        <div id="alert-description">\n            <p id="alert-content-txt" class="extension-txt">\n              ${options.content}\n            </p>\n            <button id="alert-return-btn" class="extension-btn">${options.buttonTitle}</button>\n        </div>\n      </div>\n    </div>\n    `;
             }(options) : function(options) {
                 return `\n  <div id="alert-dialog-wrapper">\n    <div id="alert-dialog-container">\n      <div id="alert-title-wrapper">\n          <div class="alert-title">\n              <p id="alert-title-txt" class="extension-title">\n                  ${options.title}\n              </p>\n              <button id="alert-x-btn">\n                  <img src="${closeImage}" alt="close" />\n              </button>\n          </div>\n          <div class="extension-border-bot">\n              \n          </div>\n      </div>\n      <div id="alert-description">\n          <p id="alert-content-txt" class="extension-txt">\n            ${options.content}\n          </p>\n      </div>\n    </div>\n  </div>\n  `;
             }(options);
             document.body.insertAdjacentHTML("afterbegin", modalTemplate), jQuery("#alert-x-btn").click((() => {
                 hideAlertMessages();
-            })), jQuery("#alert-return-btn").click((() => {
-                hideAlertMessages(), window.location.href = redirectUrl;
+            })), buttonUrl && jQuery("#alert-return-btn").click((() => {
+                hideAlertMessages(), window.location.href = buttonUrl;
             }));
         }
         function hideAlertMessages() {
-            document.querySelector("#alert-dialog-wrapper") && document.querySelector("#alert-dialog-wrapper").remove();
+            const alertWrapper = document.querySelector("#alert-dialog-wrapper");
+            alertWrapper && alertWrapper.remove();
         }
         const DEFAULT_TEARDOWN = {
             showAlert: !1
@@ -191,7 +192,7 @@
                 this._chatApi = chatApi;
             }
             onIdleWarning() {
-                debug("Idle Warning called"), showButtonMessage(idleWarningModal, void 0), this._idleKickTimeout = setTimeout(this.onIdleTimeout.bind(this), 6e4);
+                debug("Idle Warning called"), showButtonMessage(idleWarningModal), this._idleKickTimeout = setTimeout(this.onIdleTimeout.bind(this), 6e4);
             }
             onIdleTimeout() {
                 debug("Idle kick called");
@@ -364,7 +365,7 @@
             getUserNickname(userId) {
                 let userNickname = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : "";
                 return this._userNicknames.has(userId) || (this._userNicknames.set(userId, userNickname), 
-                this._nicknamesInUse.push(userNickname)), this._userNicknames.get(userId);
+                this._nicknamesInUse.push(userNickname)), escapeStr(this._userNicknames.get(userId));
             }
             _getDefaultIconUrl() {
                 let iconURL = chrome.runtime.getURL("img/icons/General/" + oldIcons[Math.floor(Math.random() * oldIcons.length)]);
@@ -414,7 +415,8 @@
                 this._userIcons.set(userId, iconUrl), this._iconsInUse.push(iconUrl), this.renderSidebar();
             }
             setUserNickname(userId, userNickname) {
-                this._userNicknames.set(userId, userNickname), this._nicknamesInUse.push(userNickname), 
+                const escapedUserNickName = escapeStr(userNickname);
+                this._userNicknames.set(userId, escapedUserNickName), this._nicknamesInUse.push(escapedUserNickName), 
                 this.renderSidebar();
             }
             updateUserData(userId, userIcon, userNickname) {
@@ -581,6 +583,10 @@
                 this.setChatVisible(!0), this.addIconSelector(), this._startEventListener(), this._chatPresenceController.setupPresenceIndicator(), 
                 this._inSession = !0;
             }
+            sendTeardown(teardownData) {
+                const teardownMessage = new TeardownMessage("Content_Script", "Service_Background", teardownData);
+                Messaging_MessagePasser.sendMessageToExtension(teardownMessage);
+            }
             _isChatInjected() {
                 return jQuery("#chat-wrapper").length > 0;
             }
@@ -744,7 +750,7 @@
             }
             _injectChat() {
                 this._chatHtml && jQuery(DisneyChatApi.MAIN_WRAPPER_SELECTOR).after(function(chatHtml) {
-                    return `\n    <style>\n      ${css_alert}\n    </style>\n    \n    <style tpInjected>\n      #chat-wrapper {\n        width: 288px !important;\n        height: 100% !important;\n        background: #1a1a1a;\n        position: fixed !important;\n        top: 0 !important;\n        left: auto !important;\n        right: 0 !important;\n        bottom: 0 !important;\n        cursor: auto;\n        user-select: text;\n        -webkit-user-select: text;\n        z-index: 9999999999 !important;\n      }\n\n      .with-chat {\n        left: 0px !important;\n        // right: 288px !important;\n        width: calc(100% - 288px) !important;\n      }\n\n      ${arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : ""}\n    \n      ${css_chat}\n      \n    </style>\n\n    ${chatHtml}\n  `;
+                    return `\n    <style>\n      ${css_alert}\n    </style>\n\n    <style tpInjected>\n      #chat-wrapper {\n        width: 288px !important;\n        height: 100% !important;\n        background: #1a1a1a;\n        position: fixed !important;\n        top: 0 !important;\n        left: auto !important;\n        right: 0 !important;\n        bottom: 0 !important;\n        cursor: auto;\n        user-select: text;\n        -webkit-user-select: text;\n        z-index: 9999999999 !important;\n      }\n\n      .with-chat {\n        left: 0px !important;\n        // right: 288px !important;\n        width: calc(100% - 288px) !important;\n      }\n\n      ${arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : ""}\n    \n      ${css_chat}\n      \n    </style>\n\n    ${chatHtml}\n  `;
                 }(this._chatHtml));
             }
             getChatVisible() {
@@ -1161,7 +1167,7 @@
         !function(PopupMessageType) {
             PopupMessageType.CREATE_SESSION = "createSession", PopupMessageType.GET_INIT_DATA = "getInitData", 
             PopupMessageType.IS_CONTENT_SCRIPT_READY = "isContentScriptReady", PopupMessageType.SET_CHAT_VISIBLE = "setChatVisible", 
-            PopupMessageType.DISCONNECT = "teardown";
+            PopupMessageType.DISCONNECT = "teardown", PopupMessageType.CLOSE_POPUP = "closePopup";
         }(PopupMessageType || (PopupMessageType = {}));
         class ContentScriptReadyMessage extends ClientMessage {
             constructor(sender, target) {
@@ -1749,7 +1755,11 @@
                 return !1;
             }
             _teardown(data) {
-                data.showAlert && showButtonMessage(data.alertModal, this._chatApi.getPartyUrl()), 
+                if (data.showAlert && data.alertModal) {
+                    var _data$buttonUrl;
+                    const buttonUrl = null !== (_data$buttonUrl = data.buttonUrl) && void 0 !== _data$buttonUrl ? _data$buttonUrl : this._chatApi.getPartyUrl();
+                    showButtonMessage(data.alertModal, buttonUrl);
+                }
                 this._videoMessageForwarder.teardown(), this._chatMessageForwarder.teardown(), this._messageReceiver.teardown(), 
                 window.telepartyLoaded = !1;
             }

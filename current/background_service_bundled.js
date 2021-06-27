@@ -276,7 +276,7 @@
             return match && match.length > 0 ? match[1] : void 0;
         }
         getFullscreenScript() {
-            return "document.getElementsByClassName(\"sizing-wrapper\")[0].requestFullscreen = function() {}\n                console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                    console.log('fullscreen click');\n                    var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                    fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                }\n        ";
+            return "\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                    console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                    document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                        console.log('fullscreen click');\n                        var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                        fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                    }\n                } \n        ";
         }
     }([], [ "content_scripts/netflix/netflix_content_bundled.js" ], "netflix", StreamingServiceName.NETFLIX, !1);
     Object.freeze(Netflix);
@@ -808,7 +808,7 @@
     !function(PopupMessageType) {
         PopupMessageType.CREATE_SESSION = "createSession", PopupMessageType.GET_INIT_DATA = "getInitData", 
         PopupMessageType.IS_CONTENT_SCRIPT_READY = "isContentScriptReady", PopupMessageType.SET_CHAT_VISIBLE = "setChatVisible", 
-        PopupMessageType.DISCONNECT = "teardown";
+        PopupMessageType.DISCONNECT = "teardown", PopupMessageType.CLOSE_POPUP = "closePopup";
     }(PopupMessageType || (PopupMessageType = {})), function(ClientMessageType) {
         ClientMessageType.BROADCAST = "brodadcast", ClientMessageType.BROADCAST_NEXT_EPISODE = "broadcastNextEpisode", 
         ClientMessageType.SEND_MESSAGE = "sendMessage", ClientMessageType.CONTENT_SCRIPT_READY = "contentScriptReady", 
@@ -924,6 +924,22 @@
         }
         _registerChromeListeners() {
             Messaging_MessagePasser.addListener(this._receiveMessage.bind(this));
+        }
+    }
+    class PopupMessage extends Message {
+        constructor(sender, target, type) {
+            var obj, key, value;
+            super(sender, target, type), value = void 0, (key = "type") in (obj = this) ? Object.defineProperty(obj, key, {
+                value,
+                enumerable: !0,
+                configurable: !0,
+                writable: !0
+            }) : obj[key] = value, this.type = type;
+        }
+    }
+    class ClosePopup extends PopupMessage {
+        constructor(sender, target) {
+            super(sender, target, PopupMessageType.CLOSE_POPUP);
         }
     }
     function BackgroundService_ownKeys(object, enumerableOnly) {
@@ -1078,6 +1094,8 @@
                         const tabId = sender.tab.id;
                         teardownMessage.sender = "Service_Background", teardownMessage.target = "Content_Script", 
                         await Messaging_MessagePasser.sendMessageToTabAsync(teardownMessage, tabId), await deleteSocketForTabAsync(tabId);
+                        const closePopupMessage = new ClosePopup("Service_Background", "Popup");
+                        Messaging_MessagePasser.sendMessageToExtension(closePopupMessage);
                     }
                 }(message, sender).then(sendResponse), !0;
             }

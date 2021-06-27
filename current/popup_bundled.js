@@ -69,7 +69,7 @@
             return match && match.length > 0 ? match[1] : void 0;
         }
         getFullscreenScript() {
-            return "document.getElementsByClassName(\"sizing-wrapper\")[0].requestFullscreen = function() {}\n                console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                    console.log('fullscreen click');\n                    var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                    fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                }\n        ";
+            return "\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                    console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                    document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                        console.log('fullscreen click');\n                        var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                        fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                    }\n                } \n        ";
         }
     }([], [ "content_scripts/netflix/netflix_content_bundled.js" ], "netflix", StreamingServiceName.NETFLIX, !1);
     Object.freeze(Netflix);
@@ -189,7 +189,7 @@
     !function(PopupMessageType) {
         PopupMessageType.CREATE_SESSION = "createSession", PopupMessageType.GET_INIT_DATA = "getInitData", 
         PopupMessageType.IS_CONTENT_SCRIPT_READY = "isContentScriptReady", PopupMessageType.SET_CHAT_VISIBLE = "setChatVisible", 
-        PopupMessageType.DISCONNECT = "teardown";
+        PopupMessageType.DISCONNECT = "teardown", PopupMessageType.CLOSE_POPUP = "closePopup";
     }(PopupMessageType || (PopupMessageType = {}));
     class Message {
         constructor(sender, target, type) {
@@ -413,6 +413,9 @@
                         stopSpinning();
                     }(), debug("Content Script Ready"), sendResponse(), Messaging_MessagePasser.removeListener(onMessage)) : message.type === ClientMessageType.CONTENT_SCRIPT_ERROR && (showError(message.data.message, message.data.showButton), 
                     stopSpinning(), sendResponse(), Messaging_MessagePasser.removeListener(onMessage)));
+                    return !1;
+                })), Messaging_MessagePasser.addListener((function(message, sender, sendResponse) {
+                    "Service_Background" == message.sender && "Popup" == message.target && message.type == PopupMessageType.CLOSE_POPUP && window.close();
                     return !1;
                 })), initContentScriptsAsync().then((async function() {
                     const isContentScriptReadyMessage = new IsContentSriptReadyMessage("Popup", "Content_Script");
