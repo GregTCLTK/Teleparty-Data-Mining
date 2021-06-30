@@ -118,7 +118,7 @@
                 return match && match.length > 0 ? match[1] : void 0;
             }
             getFullscreenScript() {
-                return "\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                    console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                    document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                        console.log('fullscreen click');\n                        var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                        fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                    }\n                } \n        ";
+                return "\n            (function() {\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                    if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                        console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                        document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                            console.log('fullscreen click');\n                            var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                            fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                        }\n                    }\n            })();\n        ";
             }
         }([], [ "content_scripts/netflix/netflix_content_bundled.js" ], "netflix", StreamingServiceName.NETFLIX, !1);
         Object.freeze(Netflix);
@@ -147,9 +147,13 @@
             async doAdCheck() {}
         } {
             constructor() {
-                super(), NetflixVideoApi_defineProperty(this, "_video", void 0), NetflixVideoApi_defineProperty(this, "_isPaused", void 0), 
-                NetflixVideoApi_defineProperty(this, "_isPausedUpdatedAt", void 0), this._uiEventsHappening = 0, 
-                this._isPaused = !1, this._isPausedUpdatedAt = 0;
+                super(), NetflixVideoApi_defineProperty(this, "_video", void 0), NetflixVideoApi_defineProperty(this, "_stateUpdatedAt", void 0), 
+                NetflixVideoApi_defineProperty(this, "_playerState", void 0), this._uiEventsHappening = 0, 
+                this._stateUpdatedAt = 0, this._playerState = {
+                    time: 0,
+                    paused: !0,
+                    loading: !1
+                };
             }
             skipIdle() {
                 jQuery(".center-controls .nf-big-play-pause-secondary").length > 0 && jQuery(".center-controls .nf-big-play-pause-secondary").trigger("click");
@@ -158,7 +162,14 @@
                 return StreamingServiceName.NETFLIX;
             }
             async waitVideoDoneLoadingAsync() {
-                await delayUntil((() => this.getPlaybackState() !== PlaybackState.LOADING && this.getPlaybackState() !== PlaybackState.IDLE), 1e4)();
+                return new Promise(((resolve, reject) => {
+                    const checkForChange = async () => {
+                        await this.waitUpdateAPIState(), this._playerState.loading || this.getPlaybackState() === PlaybackState.LOADING || this.getPlaybackState() === PlaybackState.IDLE ? setTimeout((() => {
+                            checkForChange();
+                        }), 100) : resolve();
+                    };
+                    checkForChange();
+                }));
             }
             async waitVideoApiReadyAsync() {
                 if (!this._video) try {
@@ -168,15 +179,6 @@
                 } catch (error) {
                     throw new Error(VideoLoadError);
                 }
-            }
-            getStateAsync() {
-                return new Promise(((resolve, reject) => {
-                    const playbackState = this.getPlaybackState(), playbackPositionMilliseconds = this._getCurrentTime();
-                    null != playbackState && null != playbackPositionMilliseconds ? resolve({
-                        playbackState,
-                        playbackPositionMilliseconds
-                    }) : reject();
-                }));
             }
             getVideoDataAsync() {
                 return new Promise(((resolve, reject) => {
@@ -193,7 +195,7 @@
                     this._uiEventsHappening += 1, debug("In continue next episode");
                     this._getVideoIdFromCurrentUrl() != parseInt(nextEpisodeMessageData.videoId) && window.postMessage({
                         type: "NEXT_EPISODE",
-                        videoId: nextEpisodeMessageData.videoId
+                        videoId: parseInt(nextEpisodeMessageData.videoId)
                     }, "*"), this._uiEventsHappening -= 1, resolve();
                 }));
             }
@@ -208,26 +210,36 @@
                     this._uiEventsHappening -= 1;
                 }));
             }
-            pause() {
-                return new Promise(((resolve, reject) => {
-                    this._uiEventsHappening += 1, (async () => {
-                        try {
-                            jQuery(".button-nfplayerPause").click(), await this._hideControls(), resolve();
-                        } catch (e) {
-                            reject(e);
-                        } finally {
-                            this._uiEventsHappening -= 1;
-                        }
-                    })();
-                }));
-            }
-            async play() {
-                this._uiEventsHappening += 1;
+            async pause() {
+                this._uiEventsHappening += 1, window.postMessage({
+                    type: "PAUSE"
+                }, "*");
                 try {
-                    jQuery(".button-nfplayerPlay").click(), await this._hideControls();
+                    await delayUntil((() => this.getPlaybackState() === PlaybackState.PAUSED), 1e3)(), 
+                    await this._hideControls();
                 } finally {
                     this._uiEventsHappening -= 1;
                 }
+            }
+            async play() {
+                this._uiEventsHappening += 1, window.postMessage({
+                    type: "PLAY"
+                }, "*");
+                try {
+                    await delayUntil((() => this.getPlaybackState() === PlaybackState.PLAYING), 1e3)(), 
+                    await this._hideControls();
+                } finally {
+                    this._uiEventsHappening -= 1;
+                }
+            }
+            async waitVideoDoneLoading() {
+                return new Promise(((resolve, reject) => {
+                    const start = performance.now(), checkForChange = async () => {
+                        const state = await this.getPlayerState(), now = performance.now();
+                        state.loading ? now - start > 5e3 ? reject(new Error("Video Didn't stop loading")) : setTimeout(checkForChange, 250) : resolve();
+                    };
+                    checkForChange();
+                }));
             }
             async setCurrentTime(time) {
                 debug("Seek called with window post Message", !0), this._uiEventsHappening += 1, 
@@ -236,8 +248,7 @@
                     time
                 }, "*");
                 try {
-                    await delay(250)(), await delayUntil((() => this.getPlaybackState() !== PlaybackState.LOADING), 1 / 0), 
-                    await this._hideControls();
+                    await delay(500)(), await this.waitVideoDoneLoading(), await this._hideControls();
                 } finally {
                     this._uiEventsHappening -= 1;
                 }
@@ -269,7 +280,7 @@
             getPlaybackState() {
                 return jQuery(".center-controls .nf-big-play-pause-secondary").length > 0 ? PlaybackState.IDLE : jQuery(".AkiraPlayerSpinner--container").length > 0 ? PlaybackState.LOADING : jQuery(".button-nfplayerPause").length > 0 ? PlaybackState.PLAYING : PlaybackState.PAUSED;
             }
-            _getCurrentTime() {
+            getHTMLCurrentTime() {
                 const video = this.getVideoElement();
                 if (video) return Math.floor(1e3 * video.currentTime);
             }
@@ -289,29 +300,46 @@
                 tempVideoId = videoDomId), tempVideoId;
             }
             onNode(evt) {
-                "IsPaused" == evt.detail.type && (this._isPaused = evt.detail.paused, this._isPausedUpdatedAt = evt.detail.updatedAt);
+                "UpdateState" == evt.detail.type && (this._playerState = {
+                    paused: evt.detail.paused,
+                    time: evt.detail.time,
+                    loading: evt.detail.loading
+                }, this._stateUpdatedAt = evt.detail.updatedAt);
             }
-            async waitUpdatePaused() {
+            async waitUpdateAPIState() {
                 const currentTime = Date.now();
                 window.postMessage({
-                    type: "IsPaused"
+                    type: "GetState"
                 }, "*");
                 try {
-                    await delayUntil((() => this._isPausedUpdatedAt >= currentTime), 500, 10)();
+                    await delayUntil((() => this._stateUpdatedAt >= currentTime), 500, 10)();
                 } catch (error) {
-                    var _video$paused;
-                    const video = this.getVideoElement();
-                    this._isPaused = null === (_video$paused = null == video ? void 0 : video.paused) || void 0 === _video$paused || _video$paused;
+                    var _this$getVideoElement3, _this$getVideoElement4, _this$getVideoElement5, _this$getVideoElement6;
+                    this._playerState = {
+                        paused: null !== (_this$getVideoElement3 = null === (_this$getVideoElement4 = this.getVideoElement()) || void 0 === _this$getVideoElement4 ? void 0 : _this$getVideoElement4.paused) && void 0 !== _this$getVideoElement3 && _this$getVideoElement3,
+                        time: null !== (_this$getVideoElement5 = null === (_this$getVideoElement6 = this.getVideoElement()) || void 0 === _this$getVideoElement6 ? void 0 : _this$getVideoElement6.currentTime) && void 0 !== _this$getVideoElement5 ? _this$getVideoElement5 : 0,
+                        loading: !1
+                    }, this._stateUpdatedAt = Date.now();
                 }
             }
             async getUpdateSessionDataAsync() {
-                const currentTime = this._getCurrentTime();
-                if (await this.waitUpdatePaused(), !currentTime) throw new Error(VideoLoadError);
-                const currentTimeUpdatedAt = Date.now();
+                return await this.waitUpdateAPIState(), {
+                    state: this._playerState.paused ? SessionState.PAUSED : SessionState.PLAYING,
+                    lastKnownTime: this._playerState.time,
+                    lastKnownTimeUpdatedAt: this._stateUpdatedAt,
+                    bufferingState: this._playerState.loading
+                };
+            }
+            async getPlayerState() {
+                return await this.waitUpdateAPIState(), this._playerState;
+            }
+            async getStateAsync() {
+                await this.waitUpdateAPIState();
+                let playbackState = this.getPlaybackState();
+                playbackState !== PlaybackState.PLAYING && playbackState !== PlaybackState.PAUSED || (playbackState = this._playerState.paused ? PlaybackState.PAUSED : PlaybackState.PLAYING);
                 return {
-                    state: this._isPaused ? SessionState.PAUSED : SessionState.PLAYING,
-                    lastKnownTime: currentTime,
-                    lastKnownTimeUpdatedAt: currentTimeUpdatedAt
+                    playbackState,
+                    playbackPositionMilliseconds: this._playerState.time
                 };
             }
         }
@@ -440,11 +468,7 @@
             sendMessageToExtension(message) {
                 let timeout = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : 2e4;
                 return new Promise(((resolve, reject) => {
-                    const sendTimeout = setTimeout((() => {
-                        reject({
-                            error: "Unable to load extension. Please refresh the page and try again."
-                        });
-                    }), timeout);
+                    const sendTimeout = setTimeout((() => {}), timeout);
                     try {
                         chrome.runtime.sendMessage(EXTENSION_ID, message, (response => {
                             chrome.runtime.lastError && console.log(chrome.runtime.lastError.message + JSON.stringify(message)), 
@@ -480,6 +504,7 @@
                 ChatEventListener_defineProperty(this, "_chatApi", void 0), ChatEventListener_defineProperty(this, "onFocus", this.onWindowFocus.bind(this)), 
                 ChatEventListener_defineProperty(this, "_idleWarningTimeout", void 0), ChatEventListener_defineProperty(this, "_idleKickTimeout", void 0), 
                 ChatEventListener_defineProperty(this, "_onReset", this.resetIdleTimer.bind(this)), 
+                ChatEventListener_defineProperty(this, "_onFullScreenChange", this._onFullScreen.bind(this)), 
                 this._chatApi = chatApi;
             }
             onIdleWarning() {
@@ -528,18 +553,20 @@
                 jQuery("#saveChanges").on("click", this._chatApi.saveChangesListener.bind(this._chatApi)), 
                 jQuery("#cancelNickname").on("click", this._chatApi.cancelNicknameListener.bind(this._chatApi)), 
                 jQuery("#chat-input-container").on("click", this._chatApi.focus.bind(this._chatApi)), 
-                jQuery("#chat-wrapper").on("mouseup", this._chatApi.onChatClicked.bind(this._chatApi));
+                jQuery("#chat-wrapper").on("mouseup", this._chatApi.onChatClicked.bind(this._chatApi)), 
+                jQuery("#chat-wrapper").on("mousedown", this._chatApi.onChatClicked.bind(this._chatApi)), 
+                jQuery("#chat-wrapper").on("keydown", this._chatApi.onChatKeyDown.bind(this._chatApi)), 
+                jQuery("#chat-wrapper").on("keyup", this._chatApi.onChatKeyUp.bind(this._chatApi)), 
+                document.addEventListener("fullscreenchange", this._onFullScreenChange);
+            }
+            _onFullScreen() {
+                this._chatApi.scrollToBottom();
             }
             _removeChatListeners() {
-                jQuery(window).off("focus", this.onFocus), jQuery(".user-icon").off("click", this._chatApi.toggleLargeUserIconButton.bind(this._chatApi)), 
-                jQuery("#user-icon").off("click", this._chatApi.toggleIconContainer.bind(this._chatApi)), 
-                jQuery("#link-icon").off("click", this._chatApi.linkIconListener.bind(this._chatApi)), 
-                jQuery(".image-button").off("click", this._chatApi.userIconSelectorListener.bind(this._chatApi)), 
-                jQuery("#chat-input").off("keypress", this._chatApi.onChatKeyPress.bind(this._chatApi)), 
-                jQuery("#saveChanges").on("click", this._chatApi.saveChangesListener.bind(this._chatApi)), 
-                jQuery("#cancelNickname").on("click", this._chatApi.cancelNicknameListener.bind(this._chatApi)), 
-                jQuery("#chat-input-container").off("click", this._chatApi.focus.bind(this._chatApi)), 
-                jQuery("#chat-wrapper").off("mouseup", this._chatApi.onChatClicked.bind(this._chatApi));
+                jQuery(window).off("focus", this.onFocus), document.removeEventListener("fullscreenchange", this._onFullScreenChange), 
+                jQuery(".user-icon").off(), jQuery("#user-icon").off(), jQuery("#link-icon").off(), 
+                jQuery(".image-button").off(), jQuery("#chat-input").off(), jQuery("#saveChanges").off(), 
+                jQuery("#cancelNickname").off(), jQuery("#chat-input-container").off(), jQuery("#chat-wrapper").off();
             }
         }
         class PresenceController {
@@ -620,6 +647,10 @@
             _addMessageToHistory(messageElement, message, userIconUrl, userNickname) {
                 messageElement.appendTo(jQuery("#chat-history")).data("permId", message.permId).data("userIcon", userIconUrl).data("userNickname", userNickname).data("message", message);
             }
+            reloadMessages() {
+                const oldMessages = JSON.parse(JSON.stringify(this._messages));
+                for (const message of oldMessages) this.addMessage(message, !1);
+            }
             addMessage(message, checkIcons) {
                 if (message.isSystemMessage && "left" === message.body && (console.log("trying to add left message"), 
                 !message.userIcon && !this._userIcons.has(message.permId))) return;
@@ -629,10 +660,10 @@
                 const userIcon = message.userIcon ? this.getUserIconURL(message.permId, message.userIcon) : this.getUserIconURL(message.permId), userNickname = message.userNickname ? this.getUserNickname(message.permId, message.userNickname) : "";
                 message.body = escapeStr(message.body);
                 const messageElement = "" === userNickname ? this.getMessageElementWithoutNickname(userIcon, message) : this.getMessageElementWithNickname(userIcon, userNickname, message);
-                this._addMessageToHistory(messageElement, message, userIcon, userNickname), this._scrollToBottom(), 
+                this._addMessageToHistory(messageElement, message, userIcon, userNickname), this.scrollToBottom(), 
                 this._increaseMessageCount();
             }
-            _scrollToBottom() {
+            scrollToBottom() {
                 jQuery("#chat-history").scrollTop(jQuery("#chat-history").prop("scrollHeight"));
             }
             clearUnreadCount() {
@@ -847,6 +878,10 @@
             }) : obj[key] = value, obj;
         }
         var css_alert = __webpack_require__(39), css_chat = __webpack_require__(644);
+        function sidebarInjected(chatHtml) {
+            let customCss = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : "";
+            return `\n    <style>\n      ${css_alert}\n    </style>\n\n    <style tpInjected>\n      #chat-wrapper {\n        width: 288px !important;\n        height: 100% !important;\n        background: #1a1a1a;\n        position: fixed !important;\n        top: 0 !important;\n        left: auto !important;\n        right: 0 !important;\n        bottom: 0 !important;\n        cursor: auto;\n        user-select: text;\n        -webkit-user-select: text;\n        z-index: 9999999999 !important;\n      }\n\n      .with-chat {\n        left: 0px !important;\n        // right: 288px !important;\n        width: calc(100% - 288px) !important;\n      }\n\n      ${customCss}\n    \n      ${css_chat}\n      \n    </style>\n\n    ${chatHtml}\n  `;
+        }
         function NetflixChatApi_defineProperty(obj, key, value) {
             return key in obj ? Object.defineProperty(obj, key, {
                 value,
@@ -867,12 +902,17 @@
                 this._showingReviewMessage = !1;
             }
             _initChat(storageData) {
-                this._userSettingsController = new UserSettingsController(storageData);
+                hideAlertMessages(), this._userSettingsController = new UserSettingsController(storageData);
                 const currentUrl = this._messageController.getUserIconURL(this._userSettingsController.permId, this._userSettingsController.userIcon);
                 this._messageController.setUserIconUrl(currentUrl), this._messageController.renderSidebar(), 
                 this._isChatInjected() && this.removeChat(), this._setChatHtml(), this._injectChat(), 
                 this.setChatVisible(!0), this.addIconSelector(), this._startEventListener(), this._chatPresenceController.setupPresenceIndicator(), 
                 this._inSession = !0;
+            }
+            reloadChat() {
+                this._isChatInjected() && this.removeChat(), this._injectChat(), this.setChatVisible(!0), 
+                this.addIconSelector(), this._stopEventListener(), this._startEventListener(), this._chatPresenceController.setupPresenceIndicator(), 
+                this.reloadMesssages(), this.scrollToBottom();
             }
             sendTeardown(teardownData) {
                 const teardownMessage = new TeardownMessage("Content_Script", "Service_Background", teardownData);
@@ -887,6 +927,12 @@
             addMessage(message) {
                 let checkIcons = arguments.length > 1 && void 0 !== arguments[1] && arguments[1];
                 this._messageController.addMessage(message, checkIcons);
+            }
+            reloadMesssages() {
+                this._messageController.reloadMessages();
+            }
+            scrollToBottom() {
+                this._messageController.scrollToBottom();
             }
             addReviewMessage() {
                 this._messageController.addReviewMessage(), this._showingReviewMessage = !0;
@@ -916,8 +962,11 @@
             _startEventListener() {
                 this._chatEventListener.startListening();
             }
+            _stopEventListener() {
+                this._chatEventListener.stopListening();
+            }
             teardown() {
-                this._chatEventListener.stopListening(), jQuery("[tpInjected]").remove(), this.setChatVisible(!1), 
+                this._stopEventListener(), jQuery("[tpInjected]").remove(), this.setChatVisible(!1), 
                 this.removeChat();
             }
             focus() {
@@ -941,7 +990,7 @@
                 jQuery("#chat-link-container").hide(), jQuery("#chat-history-container").hide(), 
                 jQuery("#chat-input-container").hide(), jQuery("#teleparty-blog-container").hide(), 
                 jQuery("#presence-indicator").hide(), jQuery("#nickname-edit").attr("placeholder", null !== (_this$_userSettingsCo = null === (_this$_userSettingsCo2 = this._userSettingsController) || void 0 === _this$_userSettingsCo2 ? void 0 : _this$_userSettingsCo2.userNickname) && void 0 !== _this$_userSettingsCo ? _this$_userSettingsCo : ""), 
-                jQuery("#nickname-edit").text(null !== (_this$_userSettingsCo3 = null === (_this$_userSettingsCo4 = this._userSettingsController) || void 0 === _this$_userSettingsCo4 ? void 0 : _this$_userSettingsCo4.userNickname) && void 0 !== _this$_userSettingsCo3 ? _this$_userSettingsCo3 : ""));
+                jQuery("#nickname-edit")[0].value = null !== (_this$_userSettingsCo3 = null === (_this$_userSettingsCo4 = this._userSettingsController) || void 0 === _this$_userSettingsCo4 ? void 0 : _this$_userSettingsCo4.userNickname) && void 0 !== _this$_userSettingsCo3 ? _this$_userSettingsCo3 : "");
             }
             toggleLargeUserIconButton() {
                 jQuery("#chat-icon-container").data("active") && (jQuery("#chat-icon-container").show(), 
@@ -988,6 +1037,9 @@
                 return new BroadcastUserSettingsMessage("Content_Script", "Service_Background", {
                     userSettings
                 });
+            }
+            onChatKeyUp(event) {
+                event.stopPropagation();
             }
             onChatKeyDown(event) {
                 event.stopPropagation(), this._chatEventListener.resetIdleTimer();
@@ -1042,18 +1094,19 @@
             }
             _injectChat() {
                 if (this._chatHtml) {
-                    const sizingWrapper = jQuery(".sizing-wrapper");
-                    if (!(sizingWrapper.length > 0)) {
-                        const teardownData = {
-                            showAlert: !0,
-                            alertModal: testParticipationModal,
-                            buttonUrl: "https://www.netflix.com/donottest"
-                        };
-                        return document.body.after(`\n  <style>\n    ${css_alert}\n  </style>\n  `), void this.sendTeardown(teardownData);
+                    const sizingWrapper = jQuery(".sizing-wrapper"), watchVideoWrapper = jQuery(".watch-video--player-view");
+                    if (sizingWrapper.length > 0) this.chatWrapper = sizingWrapper, this.chatWrapper.after(sidebarInjected(this._chatHtml)); else {
+                        if (!(watchVideoWrapper.length > 0)) {
+                            const teardownData = {
+                                showAlert: !0,
+                                alertModal: testParticipationModal,
+                                buttonUrl: "https://www.netflix.com/donottest"
+                            };
+                            return document.body.after(`\n  <style>\n    ${css_alert}\n  </style>\n  `), void this.sendTeardown(teardownData);
+                        }
+                        this.chatWrapper = watchVideoWrapper, this.chatWrapper.append(sidebarInjected(this._chatHtml));
                     }
-                    this.chatWrapper = sizingWrapper, this.chatWrapper.after(function(chatHtml) {
-                        return `\n    <style>\n      ${css_alert}\n    </style>\n\n    <style tpInjected>\n      #chat-wrapper {\n        width: 288px !important;\n        height: 100% !important;\n        background: #1a1a1a;\n        position: fixed !important;\n        top: 0 !important;\n        left: auto !important;\n        right: 0 !important;\n        bottom: 0 !important;\n        cursor: auto;\n        user-select: text;\n        -webkit-user-select: text;\n        z-index: 9999999999 !important;\n      }\n\n      .with-chat {\n        left: 0px !important;\n        // right: 288px !important;\n        width: calc(100% - 288px) !important;\n      }\n\n      ${arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : ""}\n    \n      ${css_chat}\n      \n    </style>\n\n    ${chatHtml}\n  `;
-                    }(this._chatHtml)), injectScriptText(Services_Netflix.getFullscreenScript()), this.chatWrapper.addClass("with-chat");
+                    this.chatWrapper.addClass("with-chat");
                 }
             }
             removeChat() {
@@ -1065,10 +1118,14 @@
                 return null !== (_this$chatWrapper$has = null === (_this$chatWrapper2 = this.chatWrapper) || void 0 === _this$chatWrapper2 ? void 0 : _this$chatWrapper2.hasClass("with-chat")) && void 0 !== _this$chatWrapper$has && _this$chatWrapper$has;
             }
             setChatVisible(visible) {
-                var _this$chatWrapper3, _this$chatWrapper4;
-                (this._shouldChatBeVisible = visible, visible) ? (null === (_this$chatWrapper3 = this.chatWrapper) || void 0 === _this$chatWrapper3 || _this$chatWrapper3.addClass("with-chat"), 
-                jQuery("#chat-wrapper").show(), document.hasFocus() || this.clearUnreadCount()) : (jQuery("#chat-wrapper").hide(), 
-                null === (_this$chatWrapper4 = this.chatWrapper) || void 0 === _this$chatWrapper4 || _this$chatWrapper4.removeClass("with-chat"));
+                if (this._shouldChatBeVisible = visible, visible) {
+                    var _this$chatWrapper3;
+                    jQuery("#chat-wrapper").length || this.reloadChat(), null === (_this$chatWrapper3 = this.chatWrapper) || void 0 === _this$chatWrapper3 || _this$chatWrapper3.addClass("with-chat"), 
+                    jQuery("#chat-wrapper").show(), document.hasFocus() || this.clearUnreadCount();
+                } else {
+                    var _this$chatWrapper4;
+                    jQuery("#chat-wrapper").hide(), null === (_this$chatWrapper4 = this.chatWrapper) || void 0 === _this$chatWrapper4 || _this$chatWrapper4.removeClass("with-chat");
+                }
             }
         }
         let PopupMessageType, ChatApiMessageType, VideoApiMessageType;
@@ -1248,13 +1305,18 @@
                 TaskManager_defineProperty(this, "_pingInQueue", !1), this.resetTasks(), this._taskArray = [], 
                 this._tasksInFlight = 0, this._tasks = Promise.resolve(), this._enabled = !0;
             }
-            pushTask(task) {
-                this._enabled && (0 === this._tasksInFlight && this.resetTasks(), this._tasksInFlight = this._taskArray.push(task), 
+            pushTask(action, name) {
+                if (!this._enabled) return;
+                const newTask = {
+                    action,
+                    name
+                };
+                0 === this._tasksInFlight && this.resetTasks(), this._tasksInFlight = this._taskArray.push(newTask), 
                 this._tasks = this._tasks.then((() => {
-                    if (this._enabled) return this._swallow(task)().then((() => {
+                    if (this._enabled) return this._swallow(newTask)().then((() => {
                         this._taskArray.shift(), this._tasksInFlight -= 1;
                     }));
-                })));
+                }));
             }
             disable() {
                 this._enabled = !1, this.resetTasks();
@@ -1262,21 +1324,16 @@
             resetTasks() {
                 this._tasks = Promise.resolve(), this._taskArray = [], this._tasksInFlight = 0;
             }
-            _swallow(action) {
+            _swallow(task) {
                 return function() {
-                    return action().catch((e => {
-                        debug("Failed Task: " + action + "with error: " + e);
-                    }));
+                    return task.action().catch((e => {}));
                 };
             }
             get tasksInFlight() {
                 return this._tasksInFlight;
             }
-            get pingInQueue() {
-                return this._pingInQueue;
-            }
-            set pingInQueue(value) {
-                this._pingInQueue = value;
+            hasTaskInQueue(name) {
+                return this._taskArray.some((task => task.name === name));
             }
         };
         class BroadcastMessage extends ClientMessage {
@@ -1360,8 +1417,8 @@
                 VideoMessageForwarder_defineProperty(this, "_localTimeMinusServerTimeRecent", []), 
                 VideoMessageForwarder_defineProperty(this, "_changingVideo", void 0), VideoMessageForwarder_defineProperty(this, "_videoChangeStartTime", void 0), 
                 VideoMessageForwarder_defineProperty(this, "_lastUpdateEventTime", void 0), VideoMessageForwarder_defineProperty(this, "_watchingAds", !1), 
-                VideoMessageForwarder_defineProperty(this, "_broadcastInQueue", !1), VideoMessageForwarder_defineProperty(this, "_hostOnly", !1), 
-                this._videoApi = videoApi, this._videoEventListener = videoEventListener, this._videoEventListener.setMessageForwarder(this), 
+                VideoMessageForwarder_defineProperty(this, "_hostOnly", !1), this._videoApi = videoApi, 
+                this._videoEventListener = videoEventListener, this._videoEventListener.setMessageForwarder(this), 
                 this._videoChangeStartTime = 0, this._changingVideo = !1, this._serverState = SessionState.PAUSED, 
                 this._lastKnownServerTime = 0, this._lastKnownServerTimeUpdatedAt = 0, this._lastUpdateEventTime = 0, 
                 this._stremingServiceName = this._videoApi.getStreamingServiceName(), debug("Video forwarder");
@@ -1433,7 +1490,8 @@
                 Messaging_MessagePasser.sendMessageToExtension(logReconnect);
             }
             tryBroadcast() {
-                this._hostOnly ? this.forceSync() : 0 != this._videoApi.uiEventsHappening || this._changingVideo || !this._sessionId || this._broadcastInQueue || TaskManager_TaskManager.pushTask(this.broadcastTask.bind(this));
+                let waitForChange = arguments.length > 0 && void 0 !== arguments[0] && arguments[0];
+                this._hostOnly ? this.forceSync() : 0 != this._videoApi.uiEventsHappening || this._changingVideo || !this._sessionId || TaskManager_TaskManager.hasTaskInQueue("BROADCAST") || TaskManager_TaskManager.pushTask((() => this._broadcastAsync(waitForChange)), "BROADCAST");
             }
             setBuffering(buffering) {
                 if (this._sessionId) {
@@ -1472,20 +1530,10 @@
                 }
             }
             async _shouldSendBroadcast(data) {
+                if (null == data.lastKnownTime || null == data.lastKnownTimeUpdatedAt || null == data.state) return !1;
                 const dif = Math.abs(data.lastKnownTime - this._getCurrentServerTime());
                 return !(data.state == this._serverState && dif < 1e3) && (dif >= 1e3 && this._stremingServiceName == StreamingServiceName.AMAZON && await delay(200)(), 
                 !0);
-            }
-            async _doBroadcastAsync() {
-                if (1 == this._changingVideo) return;
-                if (this._hostOnly) return void this.forceSync();
-                const oldState = this._serverState, updateMessage = await this._getUpdateMessageForVideoStateAsync();
-                if (await this._shouldSendBroadcast(updateMessage.data)) if (updateMessage.data.bufferingState) {
-                    await Messaging_MessagePasser.sendMessageToExtension(updateMessage), await this._videoApi.waitVideoDoneLoadingAsync();
-                    const newUpdateMessage = await this._getUpdateMessageForVideoStateAsync();
-                    newUpdateMessage.data.bufferingState = !0, oldState == SessionState.PLAYING && (newUpdateMessage.data.state = SessionState.PLAYING), 
-                    await Messaging_MessagePasser.sendMessageToExtension(newUpdateMessage);
-                } else await Messaging_MessagePasser.sendMessageToExtension(updateMessage);
             }
             async _getUpdateMessageForVideoStateAsync() {
                 const updateSessionData = await this._videoApi.getUpdateSessionDataAsync();
@@ -1503,8 +1551,8 @@
                     debug("Continue next episode called"), this._changingVideo = !0, await this._videoApi.jumpToNextEpisode(nextEpisodeMessageData), 
                     await this._videoEventListener.loadNewVideoAsync(nextEpisodeMessageData.videoId), 
                     debug("After load new video"), this._videoEventListener.reloadListeners(), this._lastUpdateEventTime < this._videoChangeStartTime && (debug("Sending broadcast after next episode"), 
-                    TaskManager_TaskManager.pushTask(this.broadcastTask.bind(this))), this._videoId = nextEpisodeMessageData.videoId, 
-                    this._changingVideo = !1;
+                    TaskManager_TaskManager.pushTask(this._broadcastAsync.bind(this), "BROADCAST")), 
+                    this._videoId = nextEpisodeMessageData.videoId, this._changingVideo = !1;
                 } catch (error) {
                     const teardownMessage = new TeardownMessage("Content_Script", "Service_Background", {
                         showAlert: !0,
@@ -1523,20 +1571,48 @@
             async _sendVideoDataAsync(sendResponse) {
                 sendResponse(await this._videoApi.getVideoDataAsync());
             }
-            async broadcastTask() {
-                this._broadcastInQueue = !0;
-                try {
-                    await this._doBroadcastAsync();
-                } finally {
-                    this._broadcastInQueue = !1;
+            async _waitForChange() {
+                return new Promise((resolve => {
+                    const start = performance.now(), checkForChange = async () => {
+                        if (performance.now() - start >= 2500) resolve(!1); else {
+                            const updateMessage = await this._getUpdateMessageForVideoStateAsync();
+                            await this._shouldSendBroadcast(updateMessage.data) ? resolve(!0) : setTimeout((() => {
+                                checkForChange();
+                            }), 50);
+                        }
+                    };
+                    checkForChange();
+                }));
+            }
+            async _broadcastAsync() {
+                let waitForChange = arguments.length > 0 && void 0 !== arguments[0] && arguments[0];
+                if (this._changingVideo) return;
+                if (this._hostOnly) return void this.forceSync();
+                const updateMessage = await this._getUpdateMessageForVideoStateAsync();
+                if (await this._shouldSendBroadcast(updateMessage.data)) await this._sendBroadcastMessage(updateMessage); else if (waitForChange) {
+                    if (await this._waitForChange()) {
+                        const newUpdateMessage = await this._getUpdateMessageForVideoStateAsync();
+                        await this._sendBroadcastMessage(newUpdateMessage);
+                    }
                 }
+            }
+            async _sendBroadcastMessage(updateMessage) {
+                if (this._changingVideo) return;
+                const oldState = this._serverState;
+                if (updateMessage.data.bufferingState) {
+                    updateMessage.data.state = SessionState.PAUSED, await Messaging_MessagePasser.sendMessageToExtension(updateMessage), 
+                    await this._videoApi.waitVideoDoneLoadingAsync();
+                    const newUpdateMessage = await this._getUpdateMessageForVideoStateAsync();
+                    newUpdateMessage.data.bufferingState = !0, oldState == SessionState.PLAYING && (newUpdateMessage.data.state = SessionState.PLAYING), 
+                    await Messaging_MessagePasser.sendMessageToExtension(newUpdateMessage);
+                } else await Messaging_MessagePasser.sendMessageToExtension(updateMessage);
             }
             async _loadSessionDataAsync(loadSessionData) {
                 const sessionData = loadSessionData.sessionCallbackData;
                 this._sessionId = sessionData.sessionId, this._serverState = sessionData.state, 
                 this._lastKnownServerTime = Number(sessionData.lastKnownTime), this._lastKnownServerTimeUpdatedAt = Number(sessionData.lastKnownTimeUpdatedAt), 
                 this._videoId = sessionData.videoId, sessionData.ownerId && (this._hostOnly = !0), 
-                loadSessionData.isCreate ? TaskManager_TaskManager.pushTask(this.broadcastTask.bind(this)) : this.forceSync(), 
+                loadSessionData.isCreate ? TaskManager_TaskManager.pushTask(this._broadcastAsync.bind(this), "BROADCAST") : this.forceSync(), 
                 this._videoEventListener.startListening(), this._setupSyncInterval();
             }
             _ping() {
@@ -1552,15 +1628,14 @@
                         }
                     })).catch((error => {
                         debug(error);
-                    })), TaskManager_TaskManager.pingInQueue = !1, resolve();
+                    })), resolve();
                 }));
             }
             _setupSyncInterval() {
                 this._syncInterval && clearInterval(this._syncInterval), this._syncInterval = setInterval((() => {
                     0 == TaskManager_TaskManager.tasksInFlight && TaskManager_TaskManager.pushTask(this._sync.bind(this));
                 }), 5e3), this._pingInterval = setInterval((() => {
-                    TaskManager_TaskManager.pingInQueue || (TaskManager_TaskManager.pingInQueue = !0, 
-                    TaskManager_TaskManager.pushTask(this._ping.bind(this)));
+                    TaskManager_TaskManager.hasTaskInQueue("PING") || TaskManager_TaskManager.pushTask(this._ping.bind(this), "PING");
                 }), 12500), this._ping();
             }
             _shouldCancelSync() {
@@ -1579,7 +1654,7 @@
             async _checkPlaying(videoState) {
                 const {playbackState, playbackPositionMilliseconds} = videoState, serverTime = this._getCurrentServerTime();
                 playbackState == PlaybackState.PAUSED && await this._videoApi.play(), Math.abs(serverTime - playbackPositionMilliseconds) > 2500 && (await this._videoApi.setCurrentTime(serverTime), 
-                playbackPositionMilliseconds > serverTime && playbackPositionMilliseconds <= serverTime + 2500 ? await this._videoApi.freeze(playbackPositionMilliseconds - serverTime) : await this._videoApi.play());
+                await this._videoApi.play());
             }
             _getServerTimeLapsed() {
                 return this._serverState === SessionState.PLAYING ? Date.now() - (this._lastKnownServerTimeUpdatedAt + this._localTimeMinusServerTimeMedian) : 0;
@@ -1636,31 +1711,35 @@
             }
             _onVideoUpdate() {
                 var _this$_videoMessageFo;
-                null === (_this$_videoMessageFo = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo || _this$_videoMessageFo.tryBroadcast();
+                null === (_this$_videoMessageFo = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo || _this$_videoMessageFo.tryBroadcast(!1);
+            }
+            _onVideoUpdateWaitForChange() {
+                var _this$_videoMessageFo2;
+                null === (_this$_videoMessageFo2 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo2 || _this$_videoMessageFo2.tryBroadcast(!0);
             }
             _onVideoBuffering() {
-                var _this$_videoMessageFo2;
-                null === (_this$_videoMessageFo2 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo2 || _this$_videoMessageFo2.setBuffering(!0);
+                var _this$_videoMessageFo3;
+                null === (_this$_videoMessageFo3 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo3 || _this$_videoMessageFo3.setBuffering(!0);
             }
             _onAdStart() {
-                var _this$_videoMessageFo3;
-                null === (_this$_videoMessageFo3 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo3 || _this$_videoMessageFo3.setWatchingAds(!0);
+                var _this$_videoMessageFo4;
+                null === (_this$_videoMessageFo4 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo4 || _this$_videoMessageFo4.setWatchingAds(!0);
             }
             _onAdEnd() {
-                var _this$_videoMessageFo4;
-                null === (_this$_videoMessageFo4 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo4 || _this$_videoMessageFo4.setWatchingAds(!1);
+                var _this$_videoMessageFo5;
+                null === (_this$_videoMessageFo5 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo5 || _this$_videoMessageFo5.setWatchingAds(!1);
             }
             _onVideoCanPlay() {
-                var _this$_videoMessageFo5;
-                null === (_this$_videoMessageFo5 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo5 || _this$_videoMessageFo5.setBuffering(!1);
+                var _this$_videoMessageFo6;
+                null === (_this$_videoMessageFo6 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo6 || _this$_videoMessageFo6.setBuffering(!1);
             }
             _onNextEpisode(videoId) {
-                var _this$_videoMessageFo6;
-                null === (_this$_videoMessageFo6 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo6 || _this$_videoMessageFo6.sendNextEpisodeAsync(videoId);
+                var _this$_videoMessageFo7;
+                null === (_this$_videoMessageFo7 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo7 || _this$_videoMessageFo7.sendNextEpisodeAsync(videoId);
             }
             _onTeardown(data) {
-                var _this$_videoMessageFo7;
-                null === (_this$_videoMessageFo7 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo7 || _this$_videoMessageFo7.sendTeardown(data);
+                var _this$_videoMessageFo8;
+                null === (_this$_videoMessageFo8 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo8 || _this$_videoMessageFo8.sendTeardown(data);
             }
             setMessageForwarder(videoMessageForwarder) {
                 this._videoMessageForwarder = videoMessageForwarder;
@@ -1669,20 +1748,23 @@
                 return !0;
             }
         } {
-            constructor(videoApi) {
+            constructor(videoApi, chatApi) {
                 super(videoApi), NetflixVideoEventListener_defineProperty(this, "_videoApi", void 0), 
-                NetflixVideoEventListener_defineProperty(this, "_videoElement", void 0), NetflixVideoEventListener_defineProperty(this, "_onUpdate", this._onVideoUpdate.bind(this)), 
+                NetflixVideoEventListener_defineProperty(this, "_chatApi", void 0), NetflixVideoEventListener_defineProperty(this, "_videoElement", void 0), 
+                NetflixVideoEventListener_defineProperty(this, "_onUpdate", this._onVideoUpdate.bind(this)), 
+                NetflixVideoEventListener_defineProperty(this, "_onInteraction", this.onUserInteraction.bind(this)), 
                 NetflixVideoEventListener_defineProperty(this, "_onReplace", this.replaceStateInteraction.bind(this)), 
-                NetflixVideoEventListener_defineProperty(this, "_onNodeMessage", void 0), NetflixVideoEventListener_defineProperty(this, "_idleObserver", void 0), 
-                NetflixVideoEventListener_defineProperty(this, "_videoCheckInterval", void 0), this._videoApi = videoApi, 
-                this._videoCheckInterval = setInterval(this.checkVideo.bind(this), 1e4), window.replaceScriptLoaded || (debug("injecting replace script"), 
-                injectScriptText('\n    if(!window.replaceScriptLoaded) {\n        window.replaceScriptLoaded = true;\n      (function(history){\n        var replaceState = history.replaceState;\n        history.replaceState = function(state) {\n          if (typeof history.onreplacestate == "function") {\n            history.onreplacestate({state: state});\n          }\n          return replaceState.apply(history, arguments);\n        }\n        var pushState = history.pushState;\n        history.pushState = function(state) {\n            if (typeof history.onpushstate == "function") {\n                history.onpushstate({state: state});\n            }\n            return pushState.apply(history, arguments);\n        };\n      })(window.history);\n\n      var popInteraction = function(e) {\n        // send message to content script w next episode\n        window.postMessage({ type: "FROM_PAGE_POP", text: "next episode from the webpage!"}, "*");\n      }\n\n      var reloadInteraction = function(e) {\n        // send message to content script w next episode\n        window.postMessage({ type: "FROM_PAGE", text: "next episode from the webpage!"}, "*");\n      }\n      window.onpopstate = popInteraction;\n      history.onreplacestate = history.onpushstate = reloadInteraction;\n    }\n')), 
-                window.injectScriptLoaded || function(scriptLocation) {
+                NetflixVideoEventListener_defineProperty(this, "_onNodeMessage", void 0), NetflixVideoEventListener_defineProperty(this, "_videoCheckInterval", void 0), 
+                NetflixVideoEventListener_defineProperty(this, "_timerState", void 0), NetflixVideoEventListener_defineProperty(this, "_stateTimerInterval", void 0), 
+                this._videoApi = videoApi, this._chatApi = chatApi, this._videoCheckInterval = setInterval(this.checkVideo.bind(this), 1e4), 
+                window.replaceScriptLoaded || (debug("injecting replace script"), injectScriptText('\n    if(!window.replaceScriptLoaded) {\n        window.replaceScriptLoaded = true;\n      (function(history){\n        var replaceState = history.replaceState;\n        history.replaceState = function(state) {\n          if (typeof history.onreplacestate == "function") {\n            history.onreplacestate({state: state});\n          }\n          return replaceState.apply(history, arguments);\n        }\n        var pushState = history.pushState;\n        history.pushState = function(state) {\n            if (typeof history.onpushstate == "function") {\n                history.onpushstate({state: state});\n            }\n            return pushState.apply(history, arguments);\n        };\n      })(window.history);\n\n      var popInteraction = function(e) {\n        // send message to content script w next episode\n        window.postMessage({ type: "FROM_PAGE_POP", text: "next episode from the webpage!"}, "*");\n      }\n\n      var reloadInteraction = function(e) {\n        // send message to content script w next episode\n        window.postMessage({ type: "FROM_PAGE", text: "next episode from the webpage!"}, "*");\n      }\n      window.onpopstate = popInteraction;\n      history.onreplacestate = history.onpushstate = reloadInteraction;\n    }\n')), 
+                window.injectScriptLoaded || (!function(scriptLocation) {
                     const s = document.createElement("script");
                     s.setAttribute("tpInjected", ""), s.src = scriptLocation, (document.head || document.documentElement).appendChild(s), 
                     s.remove();
                 }(chrome.extension.getURL("content_scripts/netflix/netflix_injected_bundled.js")), 
-                this._onNodeMessage = this._videoApi.onNode.bind(this._videoApi), window.addEventListener("FromNode", this._onNodeMessage, !1);
+                injectScriptText(Services_Netflix.getFullscreenScript())), this._onNodeMessage = this._videoApi.onNode.bind(this._videoApi), 
+                window.addEventListener("FromNode", this._onNodeMessage, !1), this._videoApi.skipIdle();
             }
             checkVideo() {
                 this._videoApi.getPlaybackState() == PlaybackState.IDLE && (debug("Detected video idle. Removing."), 
@@ -1702,21 +1784,55 @@
             reloadListeners() {
                 this.stopListening(), this.startListening(), injectScriptText(Services_Netflix.getFullscreenScript());
             }
+            async onUserInteraction() {
+                TaskManager_TaskManager.tasksInFlight < 5 && !TaskManager_TaskManager.hasTaskInQueue("NETFLIX_WAIT_FOR_CHANGE") && this._onVideoUpdateWaitForChange();
+            }
+            didChangeHappen(oldState, newState) {
+                return (newState.paused !== oldState.paused || Math.abs(newState.time - oldState.time) > 2500) && (console.log("Change"), 
+                console.log(newState), !0);
+            }
+            async waitForVideoChange(oldVideoState, oldHtmlTime) {
+                var _this$_videoApi$getHT;
+                const oldState = null != oldVideoState ? oldVideoState : await this._videoApi.getPlayerState(), oldTime = null != oldHtmlTime ? oldHtmlTime : null !== (_this$_videoApi$getHT = this._videoApi.getHTMLCurrentTime()) && void 0 !== _this$_videoApi$getHT ? _this$_videoApi$getHT : 0;
+                console.log("Old State: " + oldTime), console.log(oldVideoState);
+                const start = performance.now();
+                return new Promise(((resolve, reject) => {
+                    console.log("New States ------");
+                    const checkForChange = async () => {
+                        const newVideoState = await this._videoApi.getPlayerState();
+                        performance.now() - start >= 2500 ? (console.log("Fail"), reject(new Error("Wait for Video Change failed"))) : this._timerState && this.didChangeHappen(this._timerState, oldState) ? (console.log("Detected Timer State Change"), 
+                        resolve()) : this.didChangeHappen(oldState, newVideoState) ? resolve() : Math.abs(newVideoState.time - oldTime) > 2500 ? (console.log("Change HTML"), 
+                        console.log(newVideoState), resolve()) : setTimeout((() => {
+                            checkForChange();
+                        }), 50);
+                    };
+                    checkForChange();
+                }));
+            }
             startListening() {
-                debug("Listening for events");
+                const checkState = async () => {
+                    try {
+                        const oldState = this._timerState;
+                        if (this._timerState = await this._videoApi.getPlayerState(), oldState) {
+                            const dif = Math.abs(oldState.time - this._timerState.time);
+                            (oldState.paused != this._timerState.paused || dif > 2500) && this._onVideoUpdateWaitForChange();
+                        }
+                        this._timerState.loading != (null == oldState ? void 0 : oldState.loading) && (this._timerState.loading ? this._onVideoBuffering() : this._onVideoCanPlay());
+                    } catch (e) {}
+                    this._stateTimerInterval = setTimeout(checkState, 250);
+                };
+                checkState();
                 const video = this.getVideo();
-                video && (video.addEventListener("play", this._onUpdate), video.addEventListener("pause", this._onUpdate), 
-                video.addEventListener("seeking", this._onUpdate)), this._videoElement = video, 
-                window.addEventListener("message", this._onReplace, !1);
+                this._videoElement = video, window.addEventListener("mouseup", this._onInteraction), 
+                window.addEventListener("keyup", this._onInteraction), window.addEventListener("message", this._onReplace, !1);
             }
             getVideo() {
                 const video = jQuery("video");
                 return video && video.length ? video[0] : void 0;
             }
             stopListening() {
-                const video = this.getVideo();
-                video && (video.removeEventListener("play", this._onUpdate), video.removeEventListener("pause", this._onUpdate), 
-                video.removeEventListener("seeking", this._onUpdate)), window.removeEventListener("message", this._onReplace, !1);
+                this._stateTimerInterval && clearTimeout(this._stateTimerInterval), window.removeEventListener("mouseup", this._onInteraction), 
+                window.removeEventListener("keyup", this._onInteraction), window.removeEventListener("message", this._onReplace, !1);
             }
             async loadNewVideoAsync(videoId) {
                 const start = performance.now();
@@ -1725,9 +1841,9 @@
                         if (Services_Netflix.getVideoId(new URL(window.location.href)) === videoId) {
                             const videoElement = document.querySelector("video");
                             if (videoElement instanceof Element && videoElement.parentElement && videoElement.parentElement.id == videoId) return debug("Loaded new netflix video"), 
-                            clearInterval(interval), void resolve();
+                            clearInterval(interval), this._chatApi.reloadChat(), void resolve();
                         }
-                        performance.now() - start >= 1e4 && (reject(new Error("Could not load new video in time.")), 
+                        performance.now() - start >= 3e4 && (reject(new Error("Could not load new video in time.")), 
                         clearInterval(interval));
                     }), 100);
                 })), await this._videoApi.waitVideoDoneLoadingAsync();
@@ -1756,7 +1872,8 @@
                 this._chatMessageForwarder = new ChatMessageForwarder(this._chatApi), this._videoMessageForwarder = new VideoMessageForwarder(this._videoApi, this._videoEventListener), 
                 this._isContentScriptReady = !1, this._showingReviewMessage = !1, this._messageReceiver = new CSMessageReceiver, 
                 this._messageReceiver.addMessageListener(this._videoMessageForwarder), this._messageReceiver.addMessageListener(this._chatMessageForwarder), 
-                this._messageReceiver.addMessageListener(this), this._setupPingPort();
+                this._messageReceiver.addMessageListener(this), this._hasBackgroundConnection = !1, 
+                this._setupPingPort();
             }
             _setupPingPort() {
                 const backgroundPort = chrome.runtime.connect();
@@ -1861,8 +1978,8 @@
             }
         } {
             constructor() {
-                const netflixVideoApi = new NetflixVideoApi;
-                super(new NetflixChatApi, netflixVideoApi, new NetflixVideoEventListener(netflixVideoApi)), 
+                const netflixVideoApi = new NetflixVideoApi, netflixChatApi = new NetflixChatApi;
+                super(netflixChatApi, netflixVideoApi, new NetflixVideoEventListener(netflixVideoApi, netflixChatApi)), 
                 debug("Netflix Content Script");
             }
         }

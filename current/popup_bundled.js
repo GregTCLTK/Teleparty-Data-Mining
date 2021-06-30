@@ -69,7 +69,7 @@
             return match && match.length > 0 ? match[1] : void 0;
         }
         getFullscreenScript() {
-            return "\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                    console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                    document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                        console.log('fullscreen click');\n                        var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                        fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                    }\n                } \n        ";
+            return "\n            (function() {\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                    if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                        console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                        document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                            console.log('fullscreen click');\n                            var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                            fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                        }\n                    }\n            })();\n        ";
         }
     }([], [ "content_scripts/netflix/netflix_content_bundled.js" ], "netflix", StreamingServiceName.NETFLIX, !1);
     Object.freeze(Netflix);
@@ -247,11 +247,7 @@
         sendMessageToExtension(message) {
             let timeout = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : 2e4;
             return new Promise(((resolve, reject) => {
-                const sendTimeout = setTimeout((() => {
-                    reject({
-                        error: "Unable to load extension. Please refresh the page and try again."
-                    });
-                }), timeout);
+                const sendTimeout = setTimeout((() => {}), timeout);
                 try {
                     chrome.runtime.sendMessage(EXTENSION_ID, message, (response => {
                         chrome.runtime.lastError && console.log(chrome.runtime.lastError.message + JSON.stringify(message)), 
@@ -365,25 +361,7 @@
                     tabs.length ? resolve(tabs[0]) : reject();
                 }));
             }));
-        }().then((async activeTab => {
-            {
-                var _activeTab$id, _activeTab$url;
-                const tabId = null !== (_activeTab$id = activeTab.id) && void 0 !== _activeTab$id ? _activeTab$id : 0;
-                console.log("Tab id: " + activeTab.id);
-                const tabUrl = new URL(null !== (_activeTab$url = activeTab.url) && void 0 !== _activeTab$url ? _activeTab$url : "");
-                let loadOldScript = await function(tabId) {
-                    return new Promise((resolve => {
-                        chrome.storage.local.get("oldScriptMap", (res => {
-                            const oldScriptMap = res.oldScriptMap;
-                            resolve(oldScriptMap && void 0 !== oldScriptMap[tabId]);
-                        }));
-                    }));
-                }(tabId);
-                if (Services_Amazon.isValidUrl(tabUrl) && (loadOldScript = !1), loadOldScript) throw stopSpinning(), 
-                runOldPopupScript(), new Error;
-            }
-            return activeTab;
-        })).then((activeTab => {
+        }().then((activeTab => {
             let extensionTab;
             if (debug("Setting up popup event listeners"), $("#create-session").click(createSessionAsync), 
             $("#close-error").click(closeErrorClicked), $("#reviewLink").click(reviewLinkClicked), 
@@ -443,28 +421,7 @@
                         const sessionId = response.sessionId;
                         showConnected(function(sessionId) {
                             return `https://www.tele.pe/join/${sessionId}`;
-                        }(sessionId)), function(sessionId) {
-                            var _extensionTab$service;
-                            _gaq.push([ "_trackEvent", "create-session", "clicked", extensionTab.serviceName ]), 
-                            function(eventType, sessionId, serviceName) {
-                                try {
-                                    if (permId) {
-                                        const data = {
-                                            userId: permId,
-                                            eventType,
-                                            sessionId,
-                                            serviceName
-                                        };
-                                        console.log("event: " + JSON.stringify(data));
-                                        const xmlhttp = new XMLHttpRequest;
-                                        xmlhttp.open("POST", "https://data.netflixparty.com/log-event"), xmlhttp.setRequestHeader("Content-Type", "application/json"), 
-                                        xmlhttp.send(JSON.stringify(data));
-                                    }
-                                } catch (e) {
-                                    console.log("log event error");
-                                }
-                            }("create-session", sessionId, null !== (_extensionTab$service = extensionTab.serviceName) && void 0 !== _extensionTab$service ? _extensionTab$service : "");
-                        }(sessionId);
+                        }(sessionId));
                     } else handleResponseError(response);
                     stopSpinning();
                 } catch (error) {

@@ -72,11 +72,6 @@
         function median(array) {
             return array.concat().sort()[Math.floor(array.length / 2)];
         }
-        !function(HboVideoType) {
-            HboVideoType.HBO_EPISODE = "episode", HboVideoType.HBO_FEATURE = "feature", HboVideoType.HBO_EXTRA = "extra", 
-            HboVideoType.NONE = "none";
-        }(HboVideoType || (HboVideoType = {}));
-        var debug = console.log.bind(window.console);
         function TaskManager_defineProperty(obj, key, value) {
             return key in obj ? Object.defineProperty(obj, key, {
                 value,
@@ -85,6 +80,10 @@
                 writable: !0
             }) : obj[key] = value, obj;
         }
+        !function(HboVideoType) {
+            HboVideoType.HBO_EPISODE = "episode", HboVideoType.HBO_FEATURE = "feature", HboVideoType.HBO_EXTRA = "extra", 
+            HboVideoType.NONE = "none";
+        }(HboVideoType || (HboVideoType = {}));
         const TaskManager_TaskManager = new class {
             constructor() {
                 TaskManager_defineProperty(this, "_tasksInFlight", void 0), TaskManager_defineProperty(this, "_taskArray", void 0), 
@@ -92,13 +91,18 @@
                 TaskManager_defineProperty(this, "_pingInQueue", !1), this.resetTasks(), this._taskArray = [], 
                 this._tasksInFlight = 0, this._tasks = Promise.resolve(), this._enabled = !0;
             }
-            pushTask(task) {
-                this._enabled && (0 === this._tasksInFlight && this.resetTasks(), this._tasksInFlight = this._taskArray.push(task), 
+            pushTask(action, name) {
+                if (!this._enabled) return;
+                const newTask = {
+                    action,
+                    name
+                };
+                0 === this._tasksInFlight && this.resetTasks(), this._tasksInFlight = this._taskArray.push(newTask), 
                 this._tasks = this._tasks.then((() => {
-                    if (this._enabled) return this._swallow(task)().then((() => {
+                    if (this._enabled) return this._swallow(newTask)().then((() => {
                         this._taskArray.shift(), this._tasksInFlight -= 1;
                     }));
-                })));
+                }));
             }
             disable() {
                 this._enabled = !1, this.resetTasks();
@@ -106,23 +110,20 @@
             resetTasks() {
                 this._tasks = Promise.resolve(), this._taskArray = [], this._tasksInFlight = 0;
             }
-            _swallow(action) {
+            _swallow(task) {
                 return function() {
-                    return action().catch((e => {
-                        debug("Failed Task: " + action + "with error: " + e);
-                    }));
+                    return task.action().catch((e => {}));
                 };
             }
             get tasksInFlight() {
                 return this._tasksInFlight;
             }
-            get pingInQueue() {
-                return this._pingInQueue;
+            hasTaskInQueue(name) {
+                return this._taskArray.some((task => task.name === name));
             }
-            set pingInQueue(value) {
-                this._pingInQueue = value;
-            }
-        }, oldIcons = [ "Batman.svg", "DeadPool.svg", "CptAmerica.svg", "Wolverine.svg", "IronMan.svg", "Goofy.svg", "Alien.svg", "Mulan.svg", "Snow-White.svg", "Poohbear.svg", "Sailormoon.svg", "Sailor Cat.svg", "Pizza.svg", "Cookie.svg", "Chocobar.svg", "hotdog.svg", "Hamburger.svg", "Popcorn.svg", "IceCream.svg", "ChickenLeg.svg" ], newIcons = [ "General/Alien.svg", "General/Batman.svg", "General/ChickenLeg.svg", "General/Chocobar.svg", "General/Cookie.svg", "General/CptAmerica.svg", "General/DeadPool.svg", "General/Goofy.svg", "General/Hamburger.svg", "General/hotdog.svg", "General/IceCream.svg", "General/IronMan.svg", "General/Mulan.svg", "General/Pizza.svg", "General/Poohbear.svg", "General/Popcorn.svg", "General/Sailor Cat.svg", "General/Sailormoon.svg", "General/Snow-White.svg", "General/Wolverine.svg", "Christmas/angel.svg", "Christmas/bell.svg", "Christmas/box.svg", "Christmas/cane.svg", "Christmas/flake.svg", "Christmas/gingerbread.svg", "Christmas/gingerbread_F.svg", "Christmas/gingerbread_M.svg", "Christmas/gloves_blue.svg", "Christmas/gloves_red.svg", "Christmas/hat.svg", "Christmas/ornament.svg", "Christmas/raindeer.svg", "Christmas/reef.svg", "Christmas/santa_F.svg", "Christmas/santa_M.svg", "Christmas/snowglobe.svg", "Christmas/snowman.svg", "Christmas/sock.svg", "Christmas/tree.svg", "Halloween/bats.svg", "Halloween/candy_corn.svg", "Halloween/cat_black.svg", "Halloween/cat_white.svg", "Halloween/coffin.svg", "Halloween/eye_ball.svg", "Halloween/face_angry.svg", "Halloween/face_evil.svg", "Halloween/face_silly.svg", "Halloween/face_smile.svg", "Halloween/frankenstein.svg", "Halloween/ghost_F.svg", "Halloween/ghost_M.svg", "Halloween/gravestone.svg", "Halloween/lollipop.svg", "Halloween/moon.svg", "Halloween/mummy.svg", "Halloween/potion.svg", "Halloween/pumpkin.svg", "Halloween/pumpkin_witch.svg", "Halloween/skull_brain.svg", "Halloween/skull_candy.svg", "Halloween/skull_girl.svg", "Halloween/witch_hat.svg", "Thanksgiving/acorn.svg", "Thanksgiving/bread.svg", "Thanksgiving/candles.svg", "Thanksgiving/corn.svg", "Thanksgiving/drinks.svg", "Thanksgiving/maple_leaf.svg", "Thanksgiving/plate_chicken.svg", "Thanksgiving/pumpkin.svg", "Thanksgiving/pumpkin_pie.svg", "Thanksgiving/slice_pie.svg", "Thanksgiving/sun_flower.svg", "Thanksgiving/turkey_face.svg" ], iconMap = {
+        };
+        var debug = console.log.bind(window.console);
+        const oldIcons = [ "Batman.svg", "DeadPool.svg", "CptAmerica.svg", "Wolverine.svg", "IronMan.svg", "Goofy.svg", "Alien.svg", "Mulan.svg", "Snow-White.svg", "Poohbear.svg", "Sailormoon.svg", "Sailor Cat.svg", "Pizza.svg", "Cookie.svg", "Chocobar.svg", "hotdog.svg", "Hamburger.svg", "Popcorn.svg", "IceCream.svg", "ChickenLeg.svg" ], newIcons = [ "General/Alien.svg", "General/Batman.svg", "General/ChickenLeg.svg", "General/Chocobar.svg", "General/Cookie.svg", "General/CptAmerica.svg", "General/DeadPool.svg", "General/Goofy.svg", "General/Hamburger.svg", "General/hotdog.svg", "General/IceCream.svg", "General/IronMan.svg", "General/Mulan.svg", "General/Pizza.svg", "General/Poohbear.svg", "General/Popcorn.svg", "General/Sailor Cat.svg", "General/Sailormoon.svg", "General/Snow-White.svg", "General/Wolverine.svg", "Christmas/angel.svg", "Christmas/bell.svg", "Christmas/box.svg", "Christmas/cane.svg", "Christmas/flake.svg", "Christmas/gingerbread.svg", "Christmas/gingerbread_F.svg", "Christmas/gingerbread_M.svg", "Christmas/gloves_blue.svg", "Christmas/gloves_red.svg", "Christmas/hat.svg", "Christmas/ornament.svg", "Christmas/raindeer.svg", "Christmas/reef.svg", "Christmas/santa_F.svg", "Christmas/santa_M.svg", "Christmas/snowglobe.svg", "Christmas/snowman.svg", "Christmas/sock.svg", "Christmas/tree.svg", "Halloween/bats.svg", "Halloween/candy_corn.svg", "Halloween/cat_black.svg", "Halloween/cat_white.svg", "Halloween/coffin.svg", "Halloween/eye_ball.svg", "Halloween/face_angry.svg", "Halloween/face_evil.svg", "Halloween/face_silly.svg", "Halloween/face_smile.svg", "Halloween/frankenstein.svg", "Halloween/ghost_F.svg", "Halloween/ghost_M.svg", "Halloween/gravestone.svg", "Halloween/lollipop.svg", "Halloween/moon.svg", "Halloween/mummy.svg", "Halloween/potion.svg", "Halloween/pumpkin.svg", "Halloween/pumpkin_witch.svg", "Halloween/skull_brain.svg", "Halloween/skull_candy.svg", "Halloween/skull_girl.svg", "Halloween/witch_hat.svg", "Thanksgiving/acorn.svg", "Thanksgiving/bread.svg", "Thanksgiving/candles.svg", "Thanksgiving/corn.svg", "Thanksgiving/drinks.svg", "Thanksgiving/maple_leaf.svg", "Thanksgiving/plate_chicken.svg", "Thanksgiving/pumpkin.svg", "Thanksgiving/pumpkin_pie.svg", "Thanksgiving/slice_pie.svg", "Thanksgiving/sun_flower.svg", "Thanksgiving/turkey_face.svg" ], iconMap = {
             General: [ "Alien.svg", "Batman.svg", "ChickenLeg.svg", "Chocobar.svg", "Cookie.svg", "CptAmerica.svg", "DeadPool.svg", "Goofy.svg", "Hamburger.svg", "hotdog.svg", "IceCream.svg", "IronMan.svg", "Mulan.svg", "Pizza.svg", "Poohbear.svg", "Popcorn.svg", "Sailor Cat.svg", "Sailormoon.svg", "Snow-White.svg", "Wolverine.svg" ],
             Christmas: [ "angel.svg", "bell.svg", "box.svg", "cane.svg", "flake.svg", "gingerbread.svg", "gingerbread_F.svg", "gingerbread_M.svg", "gloves_blue.svg", "gloves_red.svg", "hat.svg", "ornament.svg", "raindeer.svg", "reef.svg", "santa_F.svg", "santa_M.svg", "snowglobe.svg", "snowman.svg", "sock.svg", "tree.svg" ],
             Halloween: [ "bats.svg", "candy_corn.svg", "cat_black.svg", "cat_white.svg", "coffin.svg", "eye_ball.svg", "face_angry.svg", "face_evil.svg", "face_silly.svg", "face_smile.svg", "frankenstein.svg", "ghost_F.svg", "ghost_M.svg", "gravestone.svg", "lollipop.svg", "moon.svg", "mummy.svg", "potion.svg", "pumpkin.svg", "pumpkin_witch.svg", "skull_brain.svg", "skull_candy.svg", "skull_girl.svg", "witch_hat.svg" ],
@@ -268,31 +269,35 @@
             }
             _onVideoUpdate() {
                 var _this$_videoMessageFo;
-                null === (_this$_videoMessageFo = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo || _this$_videoMessageFo.tryBroadcast();
+                null === (_this$_videoMessageFo = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo || _this$_videoMessageFo.tryBroadcast(!1);
+            }
+            _onVideoUpdateWaitForChange() {
+                var _this$_videoMessageFo2;
+                null === (_this$_videoMessageFo2 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo2 || _this$_videoMessageFo2.tryBroadcast(!0);
             }
             _onVideoBuffering() {
-                var _this$_videoMessageFo2;
-                null === (_this$_videoMessageFo2 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo2 || _this$_videoMessageFo2.setBuffering(!0);
+                var _this$_videoMessageFo3;
+                null === (_this$_videoMessageFo3 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo3 || _this$_videoMessageFo3.setBuffering(!0);
             }
             _onAdStart() {
-                var _this$_videoMessageFo3;
-                null === (_this$_videoMessageFo3 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo3 || _this$_videoMessageFo3.setWatchingAds(!0);
+                var _this$_videoMessageFo4;
+                null === (_this$_videoMessageFo4 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo4 || _this$_videoMessageFo4.setWatchingAds(!0);
             }
             _onAdEnd() {
-                var _this$_videoMessageFo4;
-                null === (_this$_videoMessageFo4 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo4 || _this$_videoMessageFo4.setWatchingAds(!1);
+                var _this$_videoMessageFo5;
+                null === (_this$_videoMessageFo5 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo5 || _this$_videoMessageFo5.setWatchingAds(!1);
             }
             _onVideoCanPlay() {
-                var _this$_videoMessageFo5;
-                null === (_this$_videoMessageFo5 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo5 || _this$_videoMessageFo5.setBuffering(!1);
+                var _this$_videoMessageFo6;
+                null === (_this$_videoMessageFo6 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo6 || _this$_videoMessageFo6.setBuffering(!1);
             }
             _onNextEpisode(videoId) {
-                var _this$_videoMessageFo6;
-                null === (_this$_videoMessageFo6 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo6 || _this$_videoMessageFo6.sendNextEpisodeAsync(videoId);
+                var _this$_videoMessageFo7;
+                null === (_this$_videoMessageFo7 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo7 || _this$_videoMessageFo7.sendNextEpisodeAsync(videoId);
             }
             _onTeardown(data) {
-                var _this$_videoMessageFo7;
-                null === (_this$_videoMessageFo7 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo7 || _this$_videoMessageFo7.sendTeardown(data);
+                var _this$_videoMessageFo8;
+                null === (_this$_videoMessageFo8 = this._videoMessageForwarder) || void 0 === _this$_videoMessageFo8 || _this$_videoMessageFo8.sendTeardown(data);
             }
             setMessageForwarder(videoMessageForwarder) {
                 this._videoMessageForwarder = videoMessageForwarder;
@@ -334,7 +339,7 @@
                 const upNextButton = this._getUpNextButton();
                 upNextButton && (upNextButton.style.left = this._chatApi.getChatVisible() ? "-250px" : "10px", 
                 upNextButton.addEventListener("mousedown", (() => {
-                    debug("Up next button clicked"), this._upNextClicked = !0, this._videoMessageForwarder.changingVideo = !0, 
+                    debug("Up next button clicked"), this._upNextClicked = !0, this._videoMessageForwarder && (this._videoMessageForwarder.changingVideo = !0), 
                     this._videoApi.triggerNextEpisode();
                 })));
             }
@@ -413,7 +418,7 @@
                 });
                 let upNextWrapper = null;
                 const dismissControls = document.querySelector("[aria-label*='Dismiss']"), subtitleControls = document.querySelector("[aria-label*='Subtitles']");
-                dismissControls ? upNextWrapper = dismissControls.parentElement.parentElement.lastElementChild : subtitleControls && (upNextWrapper = subtitleControls.parentElement.parentElement.parentElement.parentElement.parentElement.lastElementChild), 
+                null != dismissControls ? upNextWrapper = dismissControls.parentElement.parentElement.lastElementChild : subtitleControls && (upNextWrapper = subtitleControls.parentElement.parentElement.parentElement.parentElement.parentElement.lastElementChild), 
                 upNextWrapper ? this._upNextObserver.observe(upNextWrapper, {
                     childList: !0
                 }) : console.log("Couldn't find up next wrapper");
@@ -446,7 +451,7 @@
                             videoElement instanceof Element && videoElement.src && (clearInterval(interval), 
                             resolve());
                         }
-                        performance.now() - start >= 1e4 && (clearInterval(interval), reject("Could not load new video in time."));
+                        performance.now() - start >= 3e4 && (clearInterval(interval), reject("Could not load new video in time."));
                     }), 200);
                 })), await delayUntil(this._videoApi.isVideoReady.bind(this._videoApi), 1 / 0)(), 
                 await this._videoApi.skipPromo(), this._onVideoCanPlay();
@@ -556,11 +561,7 @@
             sendMessageToExtension(message) {
                 let timeout = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : 2e4;
                 return new Promise(((resolve, reject) => {
-                    const sendTimeout = setTimeout((() => {
-                        reject({
-                            error: "Unable to load extension. Please refresh the page and try again."
-                        });
-                    }), timeout);
+                    const sendTimeout = setTimeout((() => {}), timeout);
                     try {
                         chrome.runtime.sendMessage(EXTENSION_ID, message, (response => {
                             chrome.runtime.lastError && console.log(chrome.runtime.lastError.message + JSON.stringify(message)), 
@@ -850,8 +851,8 @@
                 VideoMessageForwarder_defineProperty(this, "_localTimeMinusServerTimeRecent", []), 
                 VideoMessageForwarder_defineProperty(this, "_changingVideo", void 0), VideoMessageForwarder_defineProperty(this, "_videoChangeStartTime", void 0), 
                 VideoMessageForwarder_defineProperty(this, "_lastUpdateEventTime", void 0), VideoMessageForwarder_defineProperty(this, "_watchingAds", !1), 
-                VideoMessageForwarder_defineProperty(this, "_broadcastInQueue", !1), VideoMessageForwarder_defineProperty(this, "_hostOnly", !1), 
-                this._videoApi = videoApi, this._videoEventListener = videoEventListener, this._videoEventListener.setMessageForwarder(this), 
+                VideoMessageForwarder_defineProperty(this, "_hostOnly", !1), this._videoApi = videoApi, 
+                this._videoEventListener = videoEventListener, this._videoEventListener.setMessageForwarder(this), 
                 this._videoChangeStartTime = 0, this._changingVideo = !1, this._serverState = SessionState.PAUSED, 
                 this._lastKnownServerTime = 0, this._lastKnownServerTimeUpdatedAt = 0, this._lastUpdateEventTime = 0, 
                 this._stremingServiceName = this._videoApi.getStreamingServiceName(), debug("Video forwarder");
@@ -923,7 +924,8 @@
                 Messaging_MessagePasser.sendMessageToExtension(logReconnect);
             }
             tryBroadcast() {
-                this._hostOnly ? this.forceSync() : 0 != this._videoApi.uiEventsHappening || this._changingVideo || !this._sessionId || this._broadcastInQueue || TaskManager_TaskManager.pushTask(this.broadcastTask.bind(this));
+                let waitForChange = arguments.length > 0 && void 0 !== arguments[0] && arguments[0];
+                this._hostOnly ? this.forceSync() : 0 != this._videoApi.uiEventsHappening || this._changingVideo || !this._sessionId || TaskManager_TaskManager.hasTaskInQueue("BROADCAST") || TaskManager_TaskManager.pushTask((() => this._broadcastAsync(waitForChange)), "BROADCAST");
             }
             setBuffering(buffering) {
                 if (this._sessionId) {
@@ -962,20 +964,10 @@
                 }
             }
             async _shouldSendBroadcast(data) {
+                if (null == data.lastKnownTime || null == data.lastKnownTimeUpdatedAt || null == data.state) return !1;
                 const dif = Math.abs(data.lastKnownTime - this._getCurrentServerTime());
                 return !(data.state == this._serverState && dif < 1e3) && (dif >= 1e3 && this._stremingServiceName == StreamingServiceName.AMAZON && await delay(200)(), 
                 !0);
-            }
-            async _doBroadcastAsync() {
-                if (1 == this._changingVideo) return;
-                if (this._hostOnly) return void this.forceSync();
-                const oldState = this._serverState, updateMessage = await this._getUpdateMessageForVideoStateAsync();
-                if (await this._shouldSendBroadcast(updateMessage.data)) if (updateMessage.data.bufferingState) {
-                    await Messaging_MessagePasser.sendMessageToExtension(updateMessage), await this._videoApi.waitVideoDoneLoadingAsync();
-                    const newUpdateMessage = await this._getUpdateMessageForVideoStateAsync();
-                    newUpdateMessage.data.bufferingState = !0, oldState == SessionState.PLAYING && (newUpdateMessage.data.state = SessionState.PLAYING), 
-                    await Messaging_MessagePasser.sendMessageToExtension(newUpdateMessage);
-                } else await Messaging_MessagePasser.sendMessageToExtension(updateMessage);
             }
             async _getUpdateMessageForVideoStateAsync() {
                 const updateSessionData = await this._videoApi.getUpdateSessionDataAsync();
@@ -993,8 +985,8 @@
                     debug("Continue next episode called"), this._changingVideo = !0, await this._videoApi.jumpToNextEpisode(nextEpisodeMessageData), 
                     await this._videoEventListener.loadNewVideoAsync(nextEpisodeMessageData.videoId), 
                     debug("After load new video"), this._videoEventListener.reloadListeners(), this._lastUpdateEventTime < this._videoChangeStartTime && (debug("Sending broadcast after next episode"), 
-                    TaskManager_TaskManager.pushTask(this.broadcastTask.bind(this))), this._videoId = nextEpisodeMessageData.videoId, 
-                    this._changingVideo = !1;
+                    TaskManager_TaskManager.pushTask(this._broadcastAsync.bind(this), "BROADCAST")), 
+                    this._videoId = nextEpisodeMessageData.videoId, this._changingVideo = !1;
                 } catch (error) {
                     const teardownMessage = new TeardownMessage("Content_Script", "Service_Background", {
                         showAlert: !0,
@@ -1013,20 +1005,48 @@
             async _sendVideoDataAsync(sendResponse) {
                 sendResponse(await this._videoApi.getVideoDataAsync());
             }
-            async broadcastTask() {
-                this._broadcastInQueue = !0;
-                try {
-                    await this._doBroadcastAsync();
-                } finally {
-                    this._broadcastInQueue = !1;
+            async _waitForChange() {
+                return new Promise((resolve => {
+                    const start = performance.now(), checkForChange = async () => {
+                        if (performance.now() - start >= 2500) resolve(!1); else {
+                            const updateMessage = await this._getUpdateMessageForVideoStateAsync();
+                            await this._shouldSendBroadcast(updateMessage.data) ? resolve(!0) : setTimeout((() => {
+                                checkForChange();
+                            }), 50);
+                        }
+                    };
+                    checkForChange();
+                }));
+            }
+            async _broadcastAsync() {
+                let waitForChange = arguments.length > 0 && void 0 !== arguments[0] && arguments[0];
+                if (this._changingVideo) return;
+                if (this._hostOnly) return void this.forceSync();
+                const updateMessage = await this._getUpdateMessageForVideoStateAsync();
+                if (await this._shouldSendBroadcast(updateMessage.data)) await this._sendBroadcastMessage(updateMessage); else if (waitForChange) {
+                    if (await this._waitForChange()) {
+                        const newUpdateMessage = await this._getUpdateMessageForVideoStateAsync();
+                        await this._sendBroadcastMessage(newUpdateMessage);
+                    }
                 }
+            }
+            async _sendBroadcastMessage(updateMessage) {
+                if (this._changingVideo) return;
+                const oldState = this._serverState;
+                if (updateMessage.data.bufferingState) {
+                    updateMessage.data.state = SessionState.PAUSED, await Messaging_MessagePasser.sendMessageToExtension(updateMessage), 
+                    await this._videoApi.waitVideoDoneLoadingAsync();
+                    const newUpdateMessage = await this._getUpdateMessageForVideoStateAsync();
+                    newUpdateMessage.data.bufferingState = !0, oldState == SessionState.PLAYING && (newUpdateMessage.data.state = SessionState.PLAYING), 
+                    await Messaging_MessagePasser.sendMessageToExtension(newUpdateMessage);
+                } else await Messaging_MessagePasser.sendMessageToExtension(updateMessage);
             }
             async _loadSessionDataAsync(loadSessionData) {
                 const sessionData = loadSessionData.sessionCallbackData;
                 this._sessionId = sessionData.sessionId, this._serverState = sessionData.state, 
                 this._lastKnownServerTime = Number(sessionData.lastKnownTime), this._lastKnownServerTimeUpdatedAt = Number(sessionData.lastKnownTimeUpdatedAt), 
                 this._videoId = sessionData.videoId, sessionData.ownerId && (this._hostOnly = !0), 
-                loadSessionData.isCreate ? TaskManager_TaskManager.pushTask(this.broadcastTask.bind(this)) : this.forceSync(), 
+                loadSessionData.isCreate ? TaskManager_TaskManager.pushTask(this._broadcastAsync.bind(this), "BROADCAST") : this.forceSync(), 
                 this._videoEventListener.startListening(), this._setupSyncInterval();
             }
             _ping() {
@@ -1042,15 +1062,14 @@
                         }
                     })).catch((error => {
                         debug(error);
-                    })), TaskManager_TaskManager.pingInQueue = !1, resolve();
+                    })), resolve();
                 }));
             }
             _setupSyncInterval() {
                 this._syncInterval && clearInterval(this._syncInterval), this._syncInterval = setInterval((() => {
                     0 == TaskManager_TaskManager.tasksInFlight && TaskManager_TaskManager.pushTask(this._sync.bind(this));
                 }), 5e3), this._pingInterval = setInterval((() => {
-                    TaskManager_TaskManager.pingInQueue || (TaskManager_TaskManager.pingInQueue = !0, 
-                    TaskManager_TaskManager.pushTask(this._ping.bind(this)));
+                    TaskManager_TaskManager.hasTaskInQueue("PING") || TaskManager_TaskManager.pushTask(this._ping.bind(this), "PING");
                 }), 12500), this._ping();
             }
             _shouldCancelSync() {
@@ -1069,7 +1088,7 @@
             async _checkPlaying(videoState) {
                 const {playbackState, playbackPositionMilliseconds} = videoState, serverTime = this._getCurrentServerTime();
                 playbackState == PlaybackState.PAUSED && await this._videoApi.play(), Math.abs(serverTime - playbackPositionMilliseconds) > 2500 && (await this._videoApi.setCurrentTime(serverTime), 
-                playbackPositionMilliseconds > serverTime && playbackPositionMilliseconds <= serverTime + 2500 ? await this._videoApi.freeze(playbackPositionMilliseconds - serverTime) : await this._videoApi.play());
+                await this._videoApi.play());
             }
             _getServerTimeLapsed() {
                 return this._serverState === SessionState.PLAYING ? Date.now() - (this._lastKnownServerTimeUpdatedAt + this._localTimeMinusServerTimeMedian) : 0;
@@ -1432,6 +1451,7 @@
                 ChatEventListener_defineProperty(this, "_chatApi", void 0), ChatEventListener_defineProperty(this, "onFocus", this.onWindowFocus.bind(this)), 
                 ChatEventListener_defineProperty(this, "_idleWarningTimeout", void 0), ChatEventListener_defineProperty(this, "_idleKickTimeout", void 0), 
                 ChatEventListener_defineProperty(this, "_onReset", this.resetIdleTimer.bind(this)), 
+                ChatEventListener_defineProperty(this, "_onFullScreenChange", this._onFullScreen.bind(this)), 
                 this._chatApi = chatApi;
             }
             onIdleWarning() {
@@ -1480,18 +1500,20 @@
                 jQuery("#saveChanges").on("click", this._chatApi.saveChangesListener.bind(this._chatApi)), 
                 jQuery("#cancelNickname").on("click", this._chatApi.cancelNicknameListener.bind(this._chatApi)), 
                 jQuery("#chat-input-container").on("click", this._chatApi.focus.bind(this._chatApi)), 
-                jQuery("#chat-wrapper").on("mouseup", this._chatApi.onChatClicked.bind(this._chatApi));
+                jQuery("#chat-wrapper").on("mouseup", this._chatApi.onChatClicked.bind(this._chatApi)), 
+                jQuery("#chat-wrapper").on("mousedown", this._chatApi.onChatClicked.bind(this._chatApi)), 
+                jQuery("#chat-wrapper").on("keydown", this._chatApi.onChatKeyDown.bind(this._chatApi)), 
+                jQuery("#chat-wrapper").on("keyup", this._chatApi.onChatKeyUp.bind(this._chatApi)), 
+                document.addEventListener("fullscreenchange", this._onFullScreenChange);
+            }
+            _onFullScreen() {
+                this._chatApi.scrollToBottom();
             }
             _removeChatListeners() {
-                jQuery(window).off("focus", this.onFocus), jQuery(".user-icon").off("click", this._chatApi.toggleLargeUserIconButton.bind(this._chatApi)), 
-                jQuery("#user-icon").off("click", this._chatApi.toggleIconContainer.bind(this._chatApi)), 
-                jQuery("#link-icon").off("click", this._chatApi.linkIconListener.bind(this._chatApi)), 
-                jQuery(".image-button").off("click", this._chatApi.userIconSelectorListener.bind(this._chatApi)), 
-                jQuery("#chat-input").off("keypress", this._chatApi.onChatKeyPress.bind(this._chatApi)), 
-                jQuery("#saveChanges").on("click", this._chatApi.saveChangesListener.bind(this._chatApi)), 
-                jQuery("#cancelNickname").on("click", this._chatApi.cancelNicknameListener.bind(this._chatApi)), 
-                jQuery("#chat-input-container").off("click", this._chatApi.focus.bind(this._chatApi)), 
-                jQuery("#chat-wrapper").off("mouseup", this._chatApi.onChatClicked.bind(this._chatApi));
+                jQuery(window).off("focus", this.onFocus), document.removeEventListener("fullscreenchange", this._onFullScreenChange), 
+                jQuery(".user-icon").off(), jQuery("#user-icon").off(), jQuery("#link-icon").off(), 
+                jQuery(".image-button").off(), jQuery("#chat-input").off(), jQuery("#saveChanges").off(), 
+                jQuery("#cancelNickname").off(), jQuery("#chat-input-container").off(), jQuery("#chat-wrapper").off();
             }
         }
         class PresenceController {
@@ -1547,6 +1569,10 @@
             _addMessageToHistory(messageElement, message, userIconUrl, userNickname) {
                 messageElement.appendTo(jQuery("#chat-history")).data("permId", message.permId).data("userIcon", userIconUrl).data("userNickname", userNickname).data("message", message);
             }
+            reloadMessages() {
+                const oldMessages = JSON.parse(JSON.stringify(this._messages));
+                for (const message of oldMessages) this.addMessage(message, !1);
+            }
             addMessage(message, checkIcons) {
                 if (message.isSystemMessage && "left" === message.body && (console.log("trying to add left message"), 
                 !message.userIcon && !this._userIcons.has(message.permId))) return;
@@ -1556,10 +1582,10 @@
                 const userIcon = message.userIcon ? this.getUserIconURL(message.permId, message.userIcon) : this.getUserIconURL(message.permId), userNickname = message.userNickname ? this.getUserNickname(message.permId, message.userNickname) : "";
                 message.body = escapeStr(message.body);
                 const messageElement = "" === userNickname ? this.getMessageElementWithoutNickname(userIcon, message) : this.getMessageElementWithNickname(userIcon, userNickname, message);
-                this._addMessageToHistory(messageElement, message, userIcon, userNickname), this._scrollToBottom(), 
+                this._addMessageToHistory(messageElement, message, userIcon, userNickname), this.scrollToBottom(), 
                 this._increaseMessageCount();
             }
-            _scrollToBottom() {
+            scrollToBottom() {
                 jQuery("#chat-history").scrollTop(jQuery("#chat-history").prop("scrollHeight"));
             }
             clearUnreadCount() {
@@ -1774,12 +1800,17 @@
                 this._showingReviewMessage = !1;
             }
             _initChat(storageData) {
-                this._userSettingsController = new UserSettingsController(storageData);
+                hideAlertMessages(), this._userSettingsController = new UserSettingsController(storageData);
                 const currentUrl = this._messageController.getUserIconURL(this._userSettingsController.permId, this._userSettingsController.userIcon);
                 this._messageController.setUserIconUrl(currentUrl), this._messageController.renderSidebar(), 
                 this._isChatInjected() && this.removeChat(), this._setChatHtml(), this._injectChat(), 
                 this.setChatVisible(!0), this.addIconSelector(), this._startEventListener(), this._chatPresenceController.setupPresenceIndicator(), 
                 this._inSession = !0;
+            }
+            reloadChat() {
+                this._isChatInjected() && this.removeChat(), this._injectChat(), this.setChatVisible(!0), 
+                this.addIconSelector(), this._stopEventListener(), this._startEventListener(), this._chatPresenceController.setupPresenceIndicator(), 
+                this.reloadMesssages(), this.scrollToBottom();
             }
             sendTeardown(teardownData) {
                 const teardownMessage = new TeardownMessage("Content_Script", "Service_Background", teardownData);
@@ -1794,6 +1825,12 @@
             addMessage(message) {
                 let checkIcons = arguments.length > 1 && void 0 !== arguments[1] && arguments[1];
                 this._messageController.addMessage(message, checkIcons);
+            }
+            reloadMesssages() {
+                this._messageController.reloadMessages();
+            }
+            scrollToBottom() {
+                this._messageController.scrollToBottom();
             }
             addReviewMessage() {
                 this._messageController.addReviewMessage(), this._showingReviewMessage = !0;
@@ -1823,8 +1860,11 @@
             _startEventListener() {
                 this._chatEventListener.startListening();
             }
+            _stopEventListener() {
+                this._chatEventListener.stopListening();
+            }
             teardown() {
-                this._chatEventListener.stopListening(), jQuery("[tpInjected]").remove(), this.setChatVisible(!1), 
+                this._stopEventListener(), jQuery("[tpInjected]").remove(), this.setChatVisible(!1), 
                 this.removeChat();
             }
             focus() {
@@ -1848,7 +1888,7 @@
                 jQuery("#chat-link-container").hide(), jQuery("#chat-history-container").hide(), 
                 jQuery("#chat-input-container").hide(), jQuery("#teleparty-blog-container").hide(), 
                 jQuery("#presence-indicator").hide(), jQuery("#nickname-edit").attr("placeholder", null !== (_this$_userSettingsCo = null === (_this$_userSettingsCo2 = this._userSettingsController) || void 0 === _this$_userSettingsCo2 ? void 0 : _this$_userSettingsCo2.userNickname) && void 0 !== _this$_userSettingsCo ? _this$_userSettingsCo : ""), 
-                jQuery("#nickname-edit").text(null !== (_this$_userSettingsCo3 = null === (_this$_userSettingsCo4 = this._userSettingsController) || void 0 === _this$_userSettingsCo4 ? void 0 : _this$_userSettingsCo4.userNickname) && void 0 !== _this$_userSettingsCo3 ? _this$_userSettingsCo3 : ""));
+                jQuery("#nickname-edit")[0].value = null !== (_this$_userSettingsCo3 = null === (_this$_userSettingsCo4 = this._userSettingsController) || void 0 === _this$_userSettingsCo4 ? void 0 : _this$_userSettingsCo4.userNickname) && void 0 !== _this$_userSettingsCo3 ? _this$_userSettingsCo3 : "");
             }
             toggleLargeUserIconButton() {
                 jQuery("#chat-icon-container").data("active") && (jQuery("#chat-icon-container").show(), 
@@ -1895,6 +1935,9 @@
                 return new BroadcastUserSettingsMessage("Content_Script", "Service_Background", {
                     userSettings
                 });
+            }
+            onChatKeyUp(event) {
+                event.stopPropagation();
             }
             onChatKeyDown(event) {
                 event.stopPropagation(), this._chatEventListener.resetIdleTimer();
@@ -1979,7 +2022,8 @@
                 this._chatMessageForwarder = new ChatMessageForwarder(this._chatApi), this._videoMessageForwarder = new VideoMessageForwarder(this._videoApi, this._videoEventListener), 
                 this._isContentScriptReady = !1, this._showingReviewMessage = !1, this._messageReceiver = new CSMessageReceiver, 
                 this._messageReceiver.addMessageListener(this._videoMessageForwarder), this._messageReceiver.addMessageListener(this._chatMessageForwarder), 
-                this._messageReceiver.addMessageListener(this), this._setupPingPort();
+                this._messageReceiver.addMessageListener(this), this._hasBackgroundConnection = !1, 
+                this._setupPingPort();
             }
             _setupPingPort() {
                 const backgroundPort = chrome.runtime.connect();

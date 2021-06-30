@@ -151,11 +151,7 @@
         sendMessageToExtension(message) {
             let timeout = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : 2e4;
             return new Promise(((resolve, reject) => {
-                const sendTimeout = setTimeout((() => {
-                    reject({
-                        error: "Unable to load extension. Please refresh the page and try again."
-                    });
-                }), timeout);
+                const sendTimeout = setTimeout((() => {}), timeout);
                 try {
                     chrome.runtime.sendMessage(EXTENSION_ID, message, (response => {
                         chrome.runtime.lastError && console.log(chrome.runtime.lastError.message + JSON.stringify(message)), 
@@ -276,7 +272,7 @@
             return match && match.length > 0 ? match[1] : void 0;
         }
         getFullscreenScript() {
-            return "\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                    console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                    document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                        console.log('fullscreen click');\n                        var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                        fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                    }\n                } \n        ";
+            return "\n            (function() {\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                    if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                        console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                        document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                            console.log('fullscreen click');\n                            var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                            fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                        }\n                    }\n            })();\n        ";
         }
     }([], [ "content_scripts/netflix/netflix_content_bundled.js" ], "netflix", StreamingServiceName.NETFLIX, !1);
     Object.freeze(Netflix);
@@ -435,6 +431,9 @@
         loadSessionData(data, userSetting) {
             this._socketEventHandler.loadSessionData(data, userSetting);
         }
+        clearSessionData() {
+            this._socketEventHandler.clearSessionData();
+        }
         _handleSocketEvents() {
             this._socket.onmessage = this._onMessage.bind(this), this._socket.onclose = this._onClose.bind(this), 
             this._socket.onerror = this._onError.bind(this), this._socket.onopen = this._onOpen.bind(this);
@@ -455,7 +454,7 @@
             this._doReconnect()) : debug("Websocket connection closed manually");
         }
         _getReconnectTimeoutInterval() {
-            return 100 * Math.pow(2, this._reconnectAttempts);
+            return 1e3 * Math.pow(2, this._reconnectAttempts);
         }
         _doReconnect() {
             if (this._reconnectAttempts++, this._reconnectAttempts > 10) this._socketEventHandler.onReconnectFailed(); else {
@@ -724,6 +723,9 @@
                 this._onNextEpisode(message);
             }
         }
+        clearSessionData() {
+            this._dataManager.sessionData = void 0;
+        }
         loadSessionData(data, userSettings) {
             this._dataManager.loadSessionData(data, userSettings);
         }
@@ -752,7 +754,7 @@
                         }));
                     }
                 }));
-            } else this.onReconnectFailed();
+            }
         }
         _onSendMessage(message) {
             var _this$_dataManager$se;
@@ -984,7 +986,9 @@
                             return response;
                         }
                         throw new Error("Failed to connect to Script. Please refresh the page and try again");
-                    }(extensionTabData.id), socket = await getSocketForTabAsync(extensionTabData.id), storageData = await getValidatedChromeStorageDataAsync(), socketUserId = await socket.getUserIdAsync(), permId = storageData.userId ? storageData.userId : socketUserId;
+                    }(extensionTabData.id), socket = await getSocketForTabAsync(extensionTabData.id);
+                    socket.clearSessionData();
+                    const storageData = await getValidatedChromeStorageDataAsync(), socketUserId = await socket.getUserIdAsync(), permId = storageData.userId ? storageData.userId : socketUserId;
                     storageData.userId || (await setPermIdAsync(socketUserId), storageData.userId = socketUserId);
                     const userSettings = getUserSettingsForStorageData(storageData), createData = {
                         controlLock: createSessionData.createSettings.controlLock,
@@ -1001,7 +1005,8 @@
                             resolve(res);
                         }));
                     })), storedSessionData = BackgroundService_objectSpread(BackgroundService_objectSpread({}, sessionData), {}, {
-                        userId: permId,
+                        userId: socketUserId,
+                        permId,
                         videoService: null == streamingService ? void 0 : streamingService.serverName,
                         messages: []
                     }), response = await async function(callbackData, tabId, storageData) {
@@ -1046,7 +1051,9 @@
                                 sessionId
                             };
                             return await async function(joinSessionData) {
-                                const extensionTabData = joinSessionData.extensionTab, streamingService = extensionTabData.streamingService, socket = await getSocketForTabAsync(extensionTabData.id), storageData = await getValidatedChromeStorageDataAsync(), socketUserId = await socket.getUserIdAsync(), permId = storageData.userId ? storageData.userId : socketUserId;
+                                const extensionTabData = joinSessionData.extensionTab, streamingService = extensionTabData.streamingService, socket = await getSocketForTabAsync(extensionTabData.id);
+                                socket.clearSessionData();
+                                const storageData = await getValidatedChromeStorageDataAsync(), socketUserId = await socket.getUserIdAsync(), permId = storageData.userId ? storageData.userId : socketUserId;
                                 storageData.userId || (await setPermIdAsync(socketUserId), storageData.userId = socketUserId);
                                 const userSettings = getUserSettingsForStorageData(storageData), joinData = {
                                     videoId: extensionTabData.videoId,
@@ -1059,7 +1066,8 @@
                                         resolve(res);
                                     }));
                                 })), storedSessionData = BackgroundService_objectSpread(BackgroundService_objectSpread({}, sessionData), {}, {
-                                    userId: permId,
+                                    userId: socketUserId,
+                                    permId,
                                     videoService: null == streamingService ? void 0 : streamingService.serverName
                                 }), res = await async function(callbackData, tabId, storageData) {
                                     if (!callbackData || callbackData.errorMessage) throw deleteRedirectDataAsync(tabId), 
