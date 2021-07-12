@@ -1,7 +1,7 @@
 (() => {
     window.seekScriptLoaded = !0, console.log("Loaded TP Netflix Injected");
     var getVideoPlayer = function() {
-        var e = window.netflix.appContext.state.playerApp.getAPI().videoPlayer, t = e.getAllPlayerSessionIds()[0];
+        var e = window.netflix.appContext.state.playerApp.getAPI().videoPlayer, t = e.getAllPlayerSessionIds().find((val => val.includes("watch")));
         return e.getVideoPlayerBySessionId(t);
     };
     function getReactInternals(root) {
