@@ -146,17 +146,21 @@
                     }
                 }));
             }
-            sendMessageToExtension(message) {
-                let timeout = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : 2e4;
+            sendMessageToExtension(message, timeout) {
                 return new Promise(((resolve, reject) => {
-                    const sendTimeout = setTimeout((() => {}), timeout);
+                    let sendTimeout = null;
+                    timeout && (sendTimeout = setTimeout((() => {
+                        reject({
+                            error: "Send Message Timeout"
+                        });
+                    }), timeout));
                     try {
                         chrome.runtime.sendMessage(EXTENSION_ID, message, (response => {
                             chrome.runtime.lastError && console.log(chrome.runtime.lastError.message + JSON.stringify(message)), 
-                            clearTimeout(sendTimeout), resolve(response);
+                            sendTimeout && clearTimeout(sendTimeout), resolve(response);
                         }));
                     } catch (error) {
-                        clearTimeout(sendTimeout), reject(error);
+                        sendTimeout && clearTimeout(sendTimeout), reject(error);
                     }
                 }));
             }
@@ -236,9 +240,11 @@
                 jQuery("#chat-input-container").on("click", this._chatApi.focus.bind(this._chatApi)), 
                 jQuery("#chat-wrapper").on("mouseup", this._chatApi.onChatClicked.bind(this._chatApi)), 
                 jQuery("#chat-wrapper").on("mousedown", this._chatApi.onChatClicked.bind(this._chatApi)), 
-                jQuery("#chat-wrapper").on("keydown", this._chatApi.onChatKeyDown.bind(this._chatApi)), 
                 jQuery("#chat-wrapper").on("keyup", this._chatApi.onChatKeyUp.bind(this._chatApi)), 
-                document.addEventListener("fullscreenchange", this._onFullScreenChange);
+                document.addEventListener("fullscreenchange", this._onFullScreenChange), document.addEventListener("keydown", this.cancelEvent.bind(this), !0);
+            }
+            cancelEvent(e) {
+                e.target !== jQuery("#chat-input")[0] && e.target !== jQuery("#nickname-edit")[0] || e.stopImmediatePropagation();
             }
             _onFullScreen() {
                 this._chatApi.scrollToBottom();
@@ -282,7 +288,7 @@
             Thanksgiving: [ "acorn.svg", "bread.svg", "candles.svg", "corn.svg", "drinks.svg", "maple_leaf.svg", "plate_chicken.svg", "pumpkin.svg", "pumpkin_pie.svg", "slice_pie.svg", "sun_flower.svg", "turkey_face.svg" ]
         };
         function escapeStr(str) {
-            return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            return str ? str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : str;
         }
         const enableIconsetFunctions = {
             General: function() {
@@ -331,6 +337,7 @@
             reloadMessages() {
                 const oldMessages = JSON.parse(JSON.stringify(this._messages));
                 for (const message of oldMessages) this.addMessage(message, !1);
+                this._messages = oldMessages;
             }
             addMessage(message, checkIcons) {
                 if (message.isSystemMessage && "left" === message.body && (console.log("trying to add left message"), 
@@ -587,9 +594,9 @@
                 this._inSession = !0;
             }
             reloadChat() {
-                this._isChatInjected() && this.removeChat(), this._injectChat(), this.setChatVisible(!0), 
-                this.addIconSelector(), this._stopEventListener(), this._startEventListener(), this._chatPresenceController.setupPresenceIndicator(), 
-                this.reloadMesssages(), this.scrollToBottom();
+                this._isChatInjected() || (this._injectChat(), this.setChatVisible(!0), this.addIconSelector(), 
+                this._stopEventListener(), this._startEventListener(), this._chatPresenceController.setupPresenceIndicator(), 
+                this.reloadMesssages(), this.scrollToBottom());
             }
             sendTeardown(teardownData) {
                 const teardownMessage = new TeardownMessage("Content_Script", "Service_Background", teardownData);

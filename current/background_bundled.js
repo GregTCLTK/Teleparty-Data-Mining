@@ -27,7 +27,7 @@
         ga.type = "text/javascript", ga.async = !0, ga.src = "https://ssl.google-analytics.com/ga.js";
         var s = document.getElementsByTagName("script")[0];
         s.parentNode.insertBefore(ga, s);
-    }(), chrome.runtime.onInstalled.addListener((function(details) {
+    }(), console.log("Script Active"), chrome.runtime.onInstalled.addListener((function(details) {
         if ("install" == details.reason) {
             console.log("This is a first install!");
             var thisVersion = chrome.runtime.getManifest().version;

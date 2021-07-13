@@ -69,7 +69,7 @@
             return match && match.length > 0 ? match[1] : void 0;
         }
         getFullscreenScript() {
-            return "\n            (function() {\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                    if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                        console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                        document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                            console.log('fullscreen click');\n                            var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                            fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                        }\n                    }\n            })();\n        ";
+            return '\n            (function() {\n                var sizingWrapper = document.getElementsByClassName("sizing-wrapper")[0];\n                    if (sizingWrapper) {\n                        sizingWrapper.requestFullscreen = function() {}\n                        document.getElementsByClassName(\'button-nfplayerFullscreen\')[0].onclick = function() {\n                            var fullScreenWrapper = document.getElementsByClassName("nf-kb-nav-wrapper")[0];\n                            fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                        }\n                    }\n            })();\n        ';
         }
     }([], [ "content_scripts/netflix/netflix_content_bundled.js" ], "netflix", StreamingServiceName.NETFLIX, !1);
     Object.freeze(Netflix);
@@ -244,17 +244,21 @@
                 }
             }));
         }
-        sendMessageToExtension(message) {
-            let timeout = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : 2e4;
+        sendMessageToExtension(message, timeout) {
             return new Promise(((resolve, reject) => {
-                const sendTimeout = setTimeout((() => {}), timeout);
+                let sendTimeout = null;
+                timeout && (sendTimeout = setTimeout((() => {
+                    reject({
+                        error: "Send Message Timeout"
+                    });
+                }), timeout));
                 try {
                     chrome.runtime.sendMessage(EXTENSION_ID, message, (response => {
                         chrome.runtime.lastError && console.log(chrome.runtime.lastError.message + JSON.stringify(message)), 
-                        clearTimeout(sendTimeout), resolve(response);
+                        sendTimeout && clearTimeout(sendTimeout), resolve(response);
                     }));
                 } catch (error) {
-                    clearTimeout(sendTimeout), reject(error);
+                    sendTimeout && clearTimeout(sendTimeout), reject(error);
                 }
             }));
         }

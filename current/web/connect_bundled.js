@@ -30,7 +30,7 @@
     };
     Object.freeze(ChromeStorageWriter);
     const ChromeStorage_ChromeStorageWriter = ChromeStorageWriter;
-    chrome.runtime.id;
+    const EXTENSION_ID = chrome.runtime.id;
     const SessionMap = new class {
         async getRedirectDataForTabAsync(tabId) {
             const redirectDataMap = (await ChromeStorage_ChromeStorageReader.getItemsAsync([ "redirectDataMap" ])).redirectDataMap, sessionDataKey = this._getKeyForSessionData(tabId);
@@ -76,6 +76,92 @@
     };
     Object.freeze(SessionMap);
     const ChromeStorage_SessionMap = SessionMap;
+    function _defineProperty(obj, key, value) {
+        return key in obj ? Object.defineProperty(obj, key, {
+            value,
+            enumerable: !0,
+            configurable: !0,
+            writable: !0
+        }) : obj[key] = value, obj;
+    }
+    let BackgroundMessageType;
+    !function(BackgroundMessageType) {
+        BackgroundMessageType.JOIN_SESSION = "joinSession", BackgroundMessageType.GET_VIDEO_DATA = "getVideoData", 
+        BackgroundMessageType.LOAD_SESSION = "loadSession", BackgroundMessageType.NO_SESSION_DATA = "noSessionData", 
+        BackgroundMessageType.TEARDOWN = "teardown", BackgroundMessageType.ON_VIDEO_UPDATE = "onVideoUpdate", 
+        BackgroundMessageType.SOCKET_LOST_CONNECTION = "socketLostConnection", BackgroundMessageType.REBOOT = "socketReconnect", 
+        BackgroundMessageType.PING = "ping", BackgroundMessageType.LOG_EVENT = "logEvent";
+    }(BackgroundMessageType || (BackgroundMessageType = {}));
+    class LogEventMessage extends class extends class {
+        constructor(sender, target, type) {
+            _defineProperty(this, "sender", void 0), _defineProperty(this, "target", void 0), 
+            _defineProperty(this, "type", void 0), this.sender = sender, this.target = target, 
+            this.type = type;
+        }
+    } {
+        constructor(sender, target, type) {
+            var obj, key, value;
+            super(sender, target, type), value = void 0, (key = "type") in (obj = this) ? Object.defineProperty(obj, key, {
+                value,
+                enumerable: !0,
+                configurable: !0,
+                writable: !0
+            }) : obj[key] = value, this.type = type;
+        }
+    } {
+        constructor(sender, target, data) {
+            var obj, key, value;
+            super(sender, target, BackgroundMessageType.LOG_EVENT), value = void 0, (key = "data") in (obj = this) ? Object.defineProperty(obj, key, {
+                value,
+                enumerable: !0,
+                configurable: !0,
+                writable: !0
+            }) : obj[key] = value, this.data = data;
+        }
+    }
+    var debug = console.log.bind(window.console);
+    const Messaging_MessagePasser = new class {
+        addListener(listener) {
+            chrome.runtime.onMessage.addListener(listener);
+        }
+        removeListener(listener) {
+            chrome.runtime.onMessage.removeListener(listener);
+        }
+        sendMessageToTabAsync(message, tabId) {
+            let timeout = arguments.length > 2 && void 0 !== arguments[2] ? arguments[2] : 2e4;
+            return new Promise(((resolve, reject) => {
+                const sendTimeout = setTimeout((() => {
+                    reject();
+                }), timeout);
+                try {
+                    chrome.tabs.sendMessage(tabId, message, (response => {
+                        chrome.runtime.lastError && debug(chrome.runtime.lastError.message + JSON.stringify(message)), 
+                        clearTimeout(sendTimeout), resolve(response);
+                    }));
+                } catch (error) {
+                    clearTimeout(sendTimeout), reject(error);
+                }
+            }));
+        }
+        sendMessageToExtension(message, timeout) {
+            return new Promise(((resolve, reject) => {
+                let sendTimeout = null;
+                timeout && (sendTimeout = setTimeout((() => {
+                    reject({
+                        error: "Send Message Timeout"
+                    });
+                }), timeout));
+                try {
+                    chrome.runtime.sendMessage(EXTENSION_ID, message, (response => {
+                        chrome.runtime.lastError && console.log(chrome.runtime.lastError.message + JSON.stringify(message)), 
+                        sendTimeout && clearTimeout(sendTimeout), resolve(response);
+                    }));
+                } catch (error) {
+                    sendTimeout && clearTimeout(sendTimeout), reject(error);
+                }
+            }));
+        }
+    };
     function sendResolve(message) {
         window.top.postMessage(message, "https://staging.tele.pe"), window.top.postMessage(message, "https://www.tele.pe");
     }
@@ -94,7 +180,15 @@
         console.log("Got event"), "https://staging.tele.pe" !== event.origin && "https://www.tele.pe" !== event.origin || (event.data && event.data.sessionId ? async function(sessionData) {
             const tabId = await getCurrentTabIdAsync();
             tabId && await ChromeStorage_SessionMap.storeRedirectDataForTabAsync(sessionData, tabId);
-            sendResolve("resolveRedirect");
+            const {sessionId, service} = sessionData, logMessage = new LogEventMessage("Iframe", "Service_Background", {
+                sessionId,
+                eventType: `redirect-${service}`
+            });
+            try {
+                await Messaging_MessagePasser.sendMessageToExtension(logMessage, 2500);
+            } finally {
+                sendResolve("resolveRedirect");
+            }
         }(event.data) : event.data && "SetOldScript" == event.data.type ? async function() {
             const tabId = await getCurrentTabIdAsync();
             tabId ? chrome.storage.local.get("oldScriptMap", (res => {

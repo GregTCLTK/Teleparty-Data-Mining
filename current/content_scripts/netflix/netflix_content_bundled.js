@@ -118,7 +118,7 @@
                 return match && match.length > 0 ? match[1] : void 0;
             }
             getFullscreenScript() {
-                return "\n            (function() {\n                const sizingWrapper = document.getElementsByClassName(\"sizing-wrapper\")[0];\n                    if (sizingWrapper) {\n                    sizingWrapper.requestFullscreen = function() {}\n                        console.log(\"fullscreen loaded? :\" + document.getElementsByClassName('button-nfplayerFullscreen').length);\n                        document.getElementsByClassName('button-nfplayerFullscreen')[0].onclick = function() {\n                            console.log('fullscreen click');\n                            var fullScreenWrapper = document.getElementsByClassName(\"nf-kb-nav-wrapper\")[0];\n                            fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                        }\n                    }\n            })();\n        ";
+                return '\n            (function() {\n                var sizingWrapper = document.getElementsByClassName("sizing-wrapper")[0];\n                    if (sizingWrapper) {\n                        sizingWrapper.requestFullscreen = function() {}\n                        document.getElementsByClassName(\'button-nfplayerFullscreen\')[0].onclick = function() {\n                            var fullScreenWrapper = document.getElementsByClassName("nf-kb-nav-wrapper")[0];\n                            fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);\n                        }\n                    }\n            })();\n        ';
             }
         }([], [ "content_scripts/netflix/netflix_content_bundled.js" ], "netflix", StreamingServiceName.NETFLIX, !1);
         Object.freeze(Netflix);
@@ -190,14 +190,17 @@
                     }) : reject(VideoLoadError);
                 }));
             }
-            jumpToNextEpisode(nextEpisodeMessageData) {
-                return new Promise((resolve => {
-                    this._uiEventsHappening += 1, debug("In continue next episode");
-                    this._getVideoIdFromCurrentUrl() != parseInt(nextEpisodeMessageData.videoId) && window.postMessage({
-                        type: "NEXT_EPISODE",
-                        videoId: parseInt(nextEpisodeMessageData.videoId)
-                    }, "*"), this._uiEventsHappening -= 1, resolve();
-                }));
+            _manualNextEpisodeClick() {
+                jQuery(".WatchNext-still-hover-container").length > 0 ? jQuery(".WatchNext-still-hover-container").click() : jQuery(".button-nfplayerNextEpisode").length > 0 ? jQuery(".button-nfplayerNextEpisode").click() : jQuery(".nf-flat-button-text").length > 0 && jQuery(".nf-flat-button-text").text().toLowerCase().includes("next episode") && jQuery(".nf-flat-button-text")[0].click();
+            }
+            async jumpToNextEpisode(nextEpisodeMessageData) {
+                this._uiEventsHappening += 1;
+                const urlVideoId = this._getVideoIdFromCurrentUrl();
+                urlVideoId != parseInt(nextEpisodeMessageData.videoId) && (urlVideoId && urlVideoId + 1 === parseInt(nextEpisodeMessageData.videoId) ? (debug("Used Manual Click"), 
+                this._manualNextEpisodeClick()) : (debug("Used React Click"), window.postMessage({
+                    type: "NEXT_EPISODE",
+                    videoId: parseInt(nextEpisodeMessageData.videoId)
+                }, "*"))), this._uiEventsHappening -= 1;
             }
             _getVideoIdFromCurrentUrl() {
                 var _window$location$href, _, _window$location$href2;
@@ -333,8 +336,14 @@
             async getPlayerState() {
                 return await this.waitUpdateAPIState(), this._playerState;
             }
+            _fixPlaybackRate() {
+                const video = this.getVideoElement();
+                if (video) {
+                    1 != video.playbackRate && (debug("Resetting playback rate to 1"), video.playbackRate = 1);
+                }
+            }
             async getStateAsync() {
-                await this.waitUpdateAPIState();
+                await this.waitUpdateAPIState(), this._fixPlaybackRate();
                 let playbackState = this.getPlaybackState();
                 playbackState !== PlaybackState.PLAYING && playbackState !== PlaybackState.PAUSED || (playbackState = this._playerState.paused ? PlaybackState.PAUSED : PlaybackState.PLAYING);
                 return {
@@ -465,17 +474,21 @@
                     }
                 }));
             }
-            sendMessageToExtension(message) {
-                let timeout = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : 2e4;
+            sendMessageToExtension(message, timeout) {
                 return new Promise(((resolve, reject) => {
-                    const sendTimeout = setTimeout((() => {}), timeout);
+                    let sendTimeout = null;
+                    timeout && (sendTimeout = setTimeout((() => {
+                        reject({
+                            error: "Send Message Timeout"
+                        });
+                    }), timeout));
                     try {
                         chrome.runtime.sendMessage(EXTENSION_ID, message, (response => {
                             chrome.runtime.lastError && console.log(chrome.runtime.lastError.message + JSON.stringify(message)), 
-                            clearTimeout(sendTimeout), resolve(response);
+                            sendTimeout && clearTimeout(sendTimeout), resolve(response);
                         }));
                     } catch (error) {
-                        clearTimeout(sendTimeout), reject(error);
+                        sendTimeout && clearTimeout(sendTimeout), reject(error);
                     }
                 }));
             }
@@ -555,9 +568,11 @@
                 jQuery("#chat-input-container").on("click", this._chatApi.focus.bind(this._chatApi)), 
                 jQuery("#chat-wrapper").on("mouseup", this._chatApi.onChatClicked.bind(this._chatApi)), 
                 jQuery("#chat-wrapper").on("mousedown", this._chatApi.onChatClicked.bind(this._chatApi)), 
-                jQuery("#chat-wrapper").on("keydown", this._chatApi.onChatKeyDown.bind(this._chatApi)), 
                 jQuery("#chat-wrapper").on("keyup", this._chatApi.onChatKeyUp.bind(this._chatApi)), 
-                document.addEventListener("fullscreenchange", this._onFullScreenChange);
+                document.addEventListener("fullscreenchange", this._onFullScreenChange), document.addEventListener("keydown", this.cancelEvent.bind(this), !0);
+            }
+            cancelEvent(e) {
+                e.target !== jQuery("#chat-input")[0] && e.target !== jQuery("#nickname-edit")[0] || e.stopImmediatePropagation();
             }
             _onFullScreen() {
                 this._chatApi.scrollToBottom();
@@ -601,7 +616,7 @@
             Thanksgiving: [ "acorn.svg", "bread.svg", "candles.svg", "corn.svg", "drinks.svg", "maple_leaf.svg", "plate_chicken.svg", "pumpkin.svg", "pumpkin_pie.svg", "slice_pie.svg", "sun_flower.svg", "turkey_face.svg" ]
         };
         function escapeStr(str) {
-            return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            return str ? str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : str;
         }
         const enableIconsetFunctions = {
             General: function() {
@@ -650,6 +665,7 @@
             reloadMessages() {
                 const oldMessages = JSON.parse(JSON.stringify(this._messages));
                 for (const message of oldMessages) this.addMessage(message, !1);
+                this._messages = oldMessages;
             }
             addMessage(message, checkIcons) {
                 if (message.isSystemMessage && "left" === message.body && (console.log("trying to add left message"), 
@@ -910,9 +926,9 @@
                 this._inSession = !0;
             }
             reloadChat() {
-                this._isChatInjected() && this.removeChat(), this._injectChat(), this.setChatVisible(!0), 
-                this.addIconSelector(), this._stopEventListener(), this._startEventListener(), this._chatPresenceController.setupPresenceIndicator(), 
-                this.reloadMesssages(), this.scrollToBottom();
+                this._isChatInjected() || (this._injectChat(), this.setChatVisible(!0), this.addIconSelector(), 
+                this._stopEventListener(), this._startEventListener(), this._chatPresenceController.setupPresenceIndicator(), 
+                this.reloadMesssages(), this.scrollToBottom());
             }
             sendTeardown(teardownData) {
                 const teardownMessage = new TeardownMessage("Content_Script", "Service_Background", teardownData);
@@ -1758,13 +1774,15 @@
                 NetflixVideoEventListener_defineProperty(this, "_timerState", void 0), NetflixVideoEventListener_defineProperty(this, "_stateTimerInterval", void 0), 
                 this._videoApi = videoApi, this._chatApi = chatApi, this._videoCheckInterval = setInterval(this.checkVideo.bind(this), 1e4), 
                 window.replaceScriptLoaded || (debug("injecting replace script"), injectScriptText('\n    if(!window.replaceScriptLoaded) {\n        window.replaceScriptLoaded = true;\n      (function(history){\n        var replaceState = history.replaceState;\n        history.replaceState = function(state) {\n          if (typeof history.onreplacestate == "function") {\n            history.onreplacestate({state: state});\n          }\n          return replaceState.apply(history, arguments);\n        }\n        var pushState = history.pushState;\n        history.pushState = function(state) {\n            if (typeof history.onpushstate == "function") {\n                history.onpushstate({state: state});\n            }\n            return pushState.apply(history, arguments);\n        };\n      })(window.history);\n\n      var popInteraction = function(e) {\n        // send message to content script w next episode\n        window.postMessage({ type: "FROM_PAGE_POP", text: "next episode from the webpage!"}, "*");\n      }\n\n      var reloadInteraction = function(e) {\n        // send message to content script w next episode\n        window.postMessage({ type: "FROM_PAGE", text: "next episode from the webpage!"}, "*");\n      }\n      window.onpopstate = popInteraction;\n      history.onreplacestate = history.onpushstate = reloadInteraction;\n    }\n')), 
-                window.injectScriptLoaded || (!function(scriptLocation) {
+                window.injectScriptLoaded || function(scriptLocation) {
                     const s = document.createElement("script");
                     s.setAttribute("tpInjected", ""), s.src = scriptLocation, (document.head || document.documentElement).appendChild(s), 
                     s.remove();
                 }(chrome.extension.getURL("content_scripts/netflix/netflix_injected_bundled.js")), 
-                injectScriptText(Services_Netflix.getFullscreenScript())), this._onNodeMessage = this._videoApi.onNode.bind(this._videoApi), 
-                window.addEventListener("FromNode", this._onNodeMessage, !1), this._videoApi.skipIdle();
+                this._videoApi.waitVideoApiReadyAsync().then((() => {
+                    injectScriptText(Services_Netflix.getFullscreenScript());
+                })), this._onNodeMessage = this._videoApi.onNode.bind(this._videoApi), window.addEventListener("FromNode", this._onNodeMessage, !1), 
+                this._videoApi.skipIdle();
             }
             checkVideo() {
                 this._videoApi.getPlaybackState() == PlaybackState.IDLE && (debug("Detected video idle. Removing."), 

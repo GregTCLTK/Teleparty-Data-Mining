@@ -34,7 +34,6 @@
             reactInstance && (reactInstance.memoizedProps.onPointerMoveCapture(1), await delay(2)());
         }
     }
-    var sizingWrapper;
     window.addEventListener("message", (function seekInteraction(e) {
         if (e.source == window) if (e.data.type && "SEEK" === e.data.type) getVideoPlayer().seek(e.data.time); else if (e.data.type && "PAUSE" === e.data.type) getVideoPlayer().pause(); else if (e.data.type && "PLAY" === e.data.type) getVideoPlayer().play(); else if (e.data.type && "IsPaused" === e.data.type) {
             const paused = getVideoPlayer().isPaused();
@@ -57,7 +56,7 @@
             });
             window.dispatchEvent(evt);
         } else if (e.data.type && "teardown" == e.data.type) window.removeEventListener("message", seekInteraction, !1), 
-        window.seekScriptLoaded = !1; else if (e.data.type && "NEXT_EPISODE" == e.data.type) {
+        window.seekScriptLoaded = !1; else if (e.data.type && "NEXT_EPISODE" == e.data.type) try {
             const playElement = function() {
                 var controlsRoot = document.querySelector(".PlayerControlsNeo__button-control-row");
                 if (null == controlsRoot) return null;
@@ -83,6 +82,8 @@
                     console.log(error);
                 }
             }(e.data.videoId);
+        } catch (error) {
+            console.log("Caught Error in React Next Episode " + error);
         } else if (e.data.type && "GetState" == e.data.type) {
             const player = getVideoPlayer();
             if (player) {
@@ -99,9 +100,5 @@
                 window.dispatchEvent(evt);
             }
         }
-    }), !1), (sizingWrapper = document.getElementsByClassName("sizing-wrapper")[0]) && (sizingWrapper.requestFullscreen = function() {}, 
-    document.getElementsByClassName("button-nfplayerFullscreen")[0].onclick = function() {
-        var fullScreenWrapper = document.getElementsByClassName("nf-kb-nav-wrapper")[0];
-        fullScreenWrapper.webkitRequestFullScreen(fullScreenWrapper.ALLOW_KEYBOARD_INPUT);
-    });
+    }), !1);
 })();
