@@ -1,6 +1,6 @@
 {
    "background": {
-      "scripts": [ "background_bundled.js", "background_service_bundled.js" ]
+      "scripts": [ "background_service_bundled.js" ]
    },
    "browser_action": {
       "default_icon": {
@@ -13,7 +13,7 @@
    "content_security_policy": "script-src 'self' https://ssl.google-analytics.com 'unsafe-eval'; object-src 'self'",
    "default_locale": "en",
    "description": "__MSG_extDescription__",
-   "differential_fingerprint": "1.a8b1f59fbb35a3fbe5c219efd71b804848db31569b69e4c3682d4c9f09946f26",
+   "differential_fingerprint": "1.c1ae2a2ab649b1db2546940693be838d5cd7cd5d596a47b6f19defd508a800e9",
    "icons": {
       "128": "img/icon.png",
       "16": "img/icon.png",
@@ -24,6 +24,6 @@
    "name": "__MSG_extName__",
    "permissions": [ "activeTab", "storage" ],
    "update_url": "https://clients2.google.com/service/update2/crx",
-   "version": "3.0.7",
+   "version": "3.1",
    "web_accessible_resources": [ "img/*.svg", "web/*", "content_scripts/hbo_max/hbo_max_injected_bundled.js", "content_scripts/hbo_now/hbo_now_injected_bundled.js", "content_scripts/amazon/amazon_injected_bundled.js", "content_scripts/hulu/hulu_injected_bundled.js", "content_scripts/netflix/netflix_injected_bundled.js", "content_scripts/disney/disney_injected_bundled.js" ]
 }

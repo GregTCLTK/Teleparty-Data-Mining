@@ -33,51 +33,12 @@
     }, __webpack_require__.o = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop), 
     (() => {
         "use strict";
-        let PopupMessageType, ClientMessageType;
-        function _defineProperty(obj, key, value) {
-            return key in obj ? Object.defineProperty(obj, key, {
-                value,
-                enumerable: !0,
-                configurable: !0,
-                writable: !0
-            }) : obj[key] = value, obj;
-        }
+        let PopupMessageType;
         !function(PopupMessageType) {
             PopupMessageType.CREATE_SESSION = "createSession", PopupMessageType.GET_INIT_DATA = "getInitData", 
             PopupMessageType.IS_CONTENT_SCRIPT_READY = "isContentScriptReady", PopupMessageType.SET_CHAT_VISIBLE = "setChatVisible", 
             PopupMessageType.DISCONNECT = "teardown", PopupMessageType.CLOSE_POPUP = "closePopup";
         }(PopupMessageType || (PopupMessageType = {}));
-        class Message {
-            constructor(sender, target, type) {
-                _defineProperty(this, "sender", void 0), _defineProperty(this, "target", void 0), 
-                _defineProperty(this, "type", void 0), this.sender = sender, this.target = target, 
-                this.type = type;
-            }
-        }
-        class ClientMessage extends Message {
-            constructor(sender, target, type) {
-                var obj, key, value;
-                super(sender, target, type), value = void 0, (key = "_type") in (obj = this) ? Object.defineProperty(obj, key, {
-                    value,
-                    enumerable: !0,
-                    configurable: !0,
-                    writable: !0
-                }) : obj[key] = value, this._type = type;
-            }
-        }
-        !function(ClientMessageType) {
-            ClientMessageType.BROADCAST = "brodadcast", ClientMessageType.BROADCAST_NEXT_EPISODE = "broadcastNextEpisode", 
-            ClientMessageType.SEND_MESSAGE = "sendMessage", ClientMessageType.CONTENT_SCRIPT_READY = "contentScriptReady", 
-            ClientMessageType.CONTENT_SCRIPT_ERROR = "contentScriptError", ClientMessageType.TEARDOWN = "teardown", 
-            ClientMessageType.GET_SESSION_DATA = "getSessionData", ClientMessageType.SET_TYPING = "setTyping", 
-            ClientMessageType.SET_BUFFERING = "setBuffering", ClientMessageType.SET_WATCHING_ADS = "setWatchingAds", 
-            ClientMessageType.BROADCAST_USER_SETTINGS = "brodadcastUserSettings";
-        }(ClientMessageType || (ClientMessageType = {}));
-        class ContentScriptReadyMessage extends ClientMessage {
-            constructor(sender, target) {
-                super(sender, target, ClientMessageType.CONTENT_SCRIPT_READY);
-            }
-        }
         const EXTENSION_ID = chrome.runtime.id;
         var debug = console.log.bind(window.console);
         const Messaging_MessagePasser = new class {
@@ -122,6 +83,41 @@
                 }));
             }
         };
+        function _defineProperty(obj, key, value) {
+            return key in obj ? Object.defineProperty(obj, key, {
+                value,
+                enumerable: !0,
+                configurable: !0,
+                writable: !0
+            }) : obj[key] = value, obj;
+        }
+        class Message {
+            constructor(sender, target, type) {
+                _defineProperty(this, "sender", void 0), _defineProperty(this, "target", void 0), 
+                _defineProperty(this, "type", void 0), this.sender = sender, this.target = target, 
+                this.type = type;
+            }
+        }
+        class ClientMessage extends Message {
+            constructor(sender, target, type) {
+                var obj, key, value;
+                super(sender, target, type), value = void 0, (key = "_type") in (obj = this) ? Object.defineProperty(obj, key, {
+                    value,
+                    enumerable: !0,
+                    configurable: !0,
+                    writable: !0
+                }) : obj[key] = value, this._type = type;
+            }
+        }
+        let ClientMessageType, BackgroundMessageType, ChatApiMessageType, SessionState, PlaybackState, VideoApiMessageType;
+        !function(ClientMessageType) {
+            ClientMessageType.BROADCAST = "brodadcast", ClientMessageType.BROADCAST_NEXT_EPISODE = "broadcastNextEpisode", 
+            ClientMessageType.SEND_MESSAGE = "sendMessage", ClientMessageType.CONTENT_SCRIPT_READY = "contentScriptReady", 
+            ClientMessageType.CONTENT_SCRIPT_ERROR = "contentScriptError", ClientMessageType.TEARDOWN = "teardown", 
+            ClientMessageType.GET_SESSION_DATA = "getSessionData", ClientMessageType.SET_TYPING = "setTyping", 
+            ClientMessageType.SET_BUFFERING = "setBuffering", ClientMessageType.SET_WATCHING_ADS = "setWatchingAds", 
+            ClientMessageType.BROADCAST_USER_SETTINGS = "brodadcastUserSettings";
+        }(ClientMessageType || (ClientMessageType = {}));
         class GetSessionDataMessage extends ClientMessage {
             constructor(sender, target, data) {
                 var obj, key, value;
@@ -133,7 +129,6 @@
                 }) : obj[key] = value, this.data = data;
             }
         }
-        let BackgroundMessageType, ChatApiMessageType, SessionState, PlaybackState, VideoApiMessageType;
         function CSMessageReceiver_defineProperty(obj, key, value) {
             return key in obj ? Object.defineProperty(obj, key, {
                 value,
@@ -147,7 +142,8 @@
             BackgroundMessageType.LOAD_SESSION = "loadSession", BackgroundMessageType.NO_SESSION_DATA = "noSessionData", 
             BackgroundMessageType.TEARDOWN = "teardown", BackgroundMessageType.ON_VIDEO_UPDATE = "onVideoUpdate", 
             BackgroundMessageType.SOCKET_LOST_CONNECTION = "socketLostConnection", BackgroundMessageType.REBOOT = "socketReconnect", 
-            BackgroundMessageType.PING = "ping", BackgroundMessageType.LOG_EVENT = "logEvent";
+            BackgroundMessageType.PING = "ping", BackgroundMessageType.LOG_EVENT = "logEvent", 
+            BackgroundMessageType.LOG_EXPERIMENT = "logExpirement";
         }(BackgroundMessageType || (BackgroundMessageType = {}));
         class CSMessageReceiver {
             constructor() {
@@ -256,7 +252,7 @@
                 this._chatApi.setChatVisible(data.visible);
             }
             _onLoadSession(data) {
-                const sessionId = data.sessionCallbackData.sessionId, partyUrl = `https://www.tele.pe/join/${sessionId}`;
+                const sessionId = data.sessionCallbackData.sessionId, partyUrl = `https://redirect.teleparty.com/join/${sessionId}`;
                 if (this._chatApi.setPartyUrl(partyUrl), this._chatApi.setSessionId(sessionId), 
                 this._chatApi._initChat(data.storageData), data.showReviewMessage && this._chatApi.addReviewMessage(), 
                 !data.isCreate) for (const message of data.sessionCallbackData.messages) this._chatApi.addMessage(message, !0);
@@ -783,17 +779,6 @@
                 this._changingVideo = changing;
             }
         }
-        class ContentScriptErrorMessage extends ClientMessage {
-            constructor(sender, target, data) {
-                var obj, key, value;
-                super(sender, target, ClientMessageType.CONTENT_SCRIPT_ERROR), value = void 0, (key = "data") in (obj = this) ? Object.defineProperty(obj, key, {
-                    value,
-                    enumerable: !0,
-                    configurable: !0,
-                    writable: !0
-                }) : obj[key] = value, this.data = data;
-            }
-        }
         const DEFAULT_TEARDOWN = {
             showAlert: !1
         }, IDLE_TEARDOWN = {
@@ -1076,8 +1061,12 @@
                 this._nicknamesInUse.push(userNickname), this.renderSidebar();
             }
             addReviewMessage() {
-                jQuery('\n          <div class="msg-container">\n          <div class="msg-txt message-system" style="width:100%">\n          <p>\n          Thanks for using Teleparty! <br> \n          If you enjoy the extension, please leave a positive review \n          <a id="reviewLink" href="https://chrome.google.com/webstore/detail/netflix-party-is-now-tele/oocalimimngaihdkbihfgmpkcpnmlaoa/reviews" style="display:inline;color:red" target="none">here!</a>\n          </p>\n          </div>\n          </div>\n          ').appendTo(jQuery("#chat-history")), 
-                jQuery("#reviewLink").click((() => {
+                jQuery('\n          <div class="msg-container">\n          <div class="msg-txt message-system" style="width:100%">\n          <p>\n          Thanks for using Teleparty! <br> \n          If you enjoy the extension, please leave a positive review \n          <a id="reviewLink" href="https://chrome.google.com/webstore/detail/netflix-party-is-now-tele/oocalimimngaihdkbihfgmpkcpnmlaoa/reviews" style="display:inline;color:red" target="none">here!</a>\n          </p>\n          </div>\n          </div>\n          ').appendTo(jQuery("#chat-history"));
+                const logEventData = {
+                    eventType: "review-shown-chrome",
+                    sessionId: this._chatApi.getSessionId()
+                }, logEventMessage = new LogEventMessage("Content_Script", "Service_Background", logEventData);
+                Messaging_MessagePasser.sendMessageToExtension(logEventMessage), jQuery("#reviewLink").click((() => {
                     chrome.storage.local.set({
                         reviewClicked: !0
                     });
@@ -1437,7 +1426,7 @@
                 this.syncFromEnd = syncFromEnd;
             }
             urlWithSessionId(sessionId) {
-                return `https://www.tele.pe/join/${sessionId}`;
+                return `https://redirect.teleparty.com/join/${sessionId}`;
             }
         }
         const HboNow = new class extends StreamingSerivce {
@@ -2025,16 +2014,16 @@
         class HboNowContentScript extends class {
             constructor(chatApi, videoApi, videoEventListener) {
                 ContentScript_defineProperty(this, "_hasBackgroundConnection", void 0), ContentScript_defineProperty(this, "_isContentScriptReady", void 0), 
-                ContentScript_defineProperty(this, "_showingReviewMessage", void 0), ContentScript_defineProperty(this, "_contentScriptError", void 0), 
+                ContentScript_defineProperty(this, "_isContentScriptLoading", void 0), ContentScript_defineProperty(this, "_showingReviewMessage", void 0), 
                 ContentScript_defineProperty(this, "_messageReceiver", void 0), ContentScript_defineProperty(this, "_chatApi", void 0), 
                 ContentScript_defineProperty(this, "_videoApi", void 0), ContentScript_defineProperty(this, "_chatMessageForwarder", void 0), 
                 ContentScript_defineProperty(this, "_videoEventListener", void 0), ContentScript_defineProperty(this, "_videoMessageForwarder", void 0), 
                 this._chatApi = chatApi, this._videoApi = videoApi, this._videoEventListener = videoEventListener, 
                 this._chatMessageForwarder = new ChatMessageForwarder(this._chatApi), this._videoMessageForwarder = new VideoMessageForwarder(this._videoApi, this._videoEventListener), 
-                this._isContentScriptReady = !1, this._showingReviewMessage = !1, this._messageReceiver = new CSMessageReceiver, 
-                this._messageReceiver.addMessageListener(this._videoMessageForwarder), this._messageReceiver.addMessageListener(this._chatMessageForwarder), 
-                this._messageReceiver.addMessageListener(this), this._hasBackgroundConnection = !1, 
-                this._setupPingPort();
+                this._isContentScriptReady = !1, this._isContentScriptLoading = !1, this._showingReviewMessage = !1, 
+                this._messageReceiver = new CSMessageReceiver, this._messageReceiver.addMessageListener(this._videoMessageForwarder), 
+                this._messageReceiver.addMessageListener(this._chatMessageForwarder), this._messageReceiver.addMessageListener(this), 
+                this._hasBackgroundConnection = !1, this._setupPingPort();
             }
             _setupPingPort() {
                 const backgroundPort = chrome.runtime.connect();
@@ -2050,13 +2039,14 @@
                 }));
             }
             onMessage(message, _sender, sendResponse) {
-                if ("Popup" == message.sender && "Content_Script" == message.target) {
+                if ("Content_Script" == message.target) {
                     if (message.type === PopupMessageType.IS_CONTENT_SCRIPT_READY) {
                         if (this._isContentScriptReady) {
-                            const readyMessage = new ContentScriptReadyMessage("Content_Script", "Popup");
-                            Messaging_MessagePasser.sendMessageToExtension(readyMessage);
-                        } else this._waitScriptReadyAsync();
-                        return sendResponse(), !0;
+                            sendResponse({
+                                ready: !0
+                            });
+                        } else this._isContentScriptLoading || (this._isContentScriptLoading = !0, this._waitScriptReadyAsync().then(sendResponse));
+                        return !0;
                     }
                     if (message.type === PopupMessageType.GET_INIT_DATA) {
                         return sendResponse(this._getInitDataResponse()), !0;
@@ -2066,9 +2056,10 @@
                         return Messaging_MessagePasser.sendMessageToExtension(teardownMessage), sendResponse(), 
                         !0;
                     }
-                } else if ("Content_Script" === message.target && message.type == BackgroundMessageType.TEARDOWN) {
-                    const teardownMessage = message;
-                    return sendResponse(), this._teardown(teardownMessage.data), !0;
+                    if ("Content_Script" === message.target && message.type == BackgroundMessageType.TEARDOWN) {
+                        const teardownMessage = message;
+                        return sendResponse(), this._teardown(teardownMessage.data), !0;
+                    }
                 }
                 return !1;
             }
@@ -2086,38 +2077,39 @@
             }
             async _waitScriptReadyAsync() {
                 try {
-                    await this.waitBackgroundConnectionReadyAsync(), await this._waitContentScriptReadyAsync();
+                    return await this.waitBackgroundConnectionReadyAsync(), await this._waitContentScriptReadyAsync();
                 } catch (error) {
-                    const errorMessage = new ContentScriptErrorMessage("Content_Script", "Popup", {
-                        message: "Failed to connect to Script. Please refresh the page and try again",
-                        showButton: !1
-                    });
-                    Messaging_MessagePasser.sendMessageToExtension(errorMessage);
+                    return {
+                        ready: !1,
+                        error: {
+                            message: "Failed to connect to Script. Please refresh the page and try again",
+                            showButton: !1
+                        }
+                    };
+                } finally {
+                    this._isContentScriptLoading = !1;
                 }
             }
             async _waitContentScriptReadyAsync() {
+                let errorData;
                 try {
                     await this._videoApi.waitVideoApiReadyAsync();
                     const response = await this._waitBackgroundResponseAsync();
-                    if (response && response.error) {
-                        debug("Error");
-                        const errorData = {
-                            message: response.error,
-                            showButton: !0
-                        }, errorMessage = new ContentScriptErrorMessage("Content_Script", "Popup", errorData);
-                        Messaging_MessagePasser.sendMessageToExtension(errorMessage), this._isContentScriptReady = !0;
-                    } else {
-                        response && response.showReviewMessage && (this._showingReviewMessage = !0);
-                        const readyMessage = new ContentScriptReadyMessage("Content_Script", "Popup");
-                        Messaging_MessagePasser.sendMessageToExtension(readyMessage), this._isContentScriptReady = !0;
-                    }
+                    response && response.error ? (debug("Error"), errorData = {
+                        message: response.error,
+                        showButton: !0
+                    }, this._isContentScriptReady = !0) : (response && response.showReviewMessage && (this._showingReviewMessage = !0), 
+                    this._isContentScriptReady = !0);
                 } catch (error) {
-                    const errorData = {
+                    errorData = {
                         message: error.message,
                         showButton: !1
-                    }, errorMessage = new ContentScriptErrorMessage("Content_Script", "Popup", errorData);
-                    Messaging_MessagePasser.sendMessageToExtension(errorMessage), this._contentScriptError = errorData;
+                    };
                 }
+                return {
+                    ready: this._isContentScriptReady,
+                    error: errorData
+                };
             }
             _getInitDataResponse() {
                 return {

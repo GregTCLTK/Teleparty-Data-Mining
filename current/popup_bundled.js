@@ -18,7 +18,7 @@
             this.syncFromEnd = syncFromEnd;
         }
         urlWithSessionId(sessionId) {
-            return `https://www.tele.pe/join/${sessionId}`;
+            return `https://redirect.teleparty.com/join/${sessionId}`;
         }
     }
     let StreamingServiceName, HboVideoType;
@@ -268,15 +268,6 @@
             super(sender, target, PopupMessageType.GET_INIT_DATA);
         }
     }
-    let ClientMessageType, BackgroundMessageType;
-    !function(ClientMessageType) {
-        ClientMessageType.BROADCAST = "brodadcast", ClientMessageType.BROADCAST_NEXT_EPISODE = "broadcastNextEpisode", 
-        ClientMessageType.SEND_MESSAGE = "sendMessage", ClientMessageType.CONTENT_SCRIPT_READY = "contentScriptReady", 
-        ClientMessageType.CONTENT_SCRIPT_ERROR = "contentScriptError", ClientMessageType.TEARDOWN = "teardown", 
-        ClientMessageType.GET_SESSION_DATA = "getSessionData", ClientMessageType.SET_TYPING = "setTyping", 
-        ClientMessageType.SET_BUFFERING = "setBuffering", ClientMessageType.SET_WATCHING_ADS = "setWatchingAds", 
-        ClientMessageType.BROADCAST_USER_SETTINGS = "brodadcastUserSettings";
-    }(ClientMessageType || (ClientMessageType = {}));
     class IsContentSriptReadyMessage extends PopupMessage {
         constructor(sender, target) {
             super(sender, target, PopupMessageType.IS_CONTENT_SCRIPT_READY);
@@ -304,12 +295,14 @@
             }) : obj[key] = value, this.type = type;
         }
     }
+    let BackgroundMessageType;
     !function(BackgroundMessageType) {
         BackgroundMessageType.JOIN_SESSION = "joinSession", BackgroundMessageType.GET_VIDEO_DATA = "getVideoData", 
         BackgroundMessageType.LOAD_SESSION = "loadSession", BackgroundMessageType.NO_SESSION_DATA = "noSessionData", 
         BackgroundMessageType.TEARDOWN = "teardown", BackgroundMessageType.ON_VIDEO_UPDATE = "onVideoUpdate", 
         BackgroundMessageType.SOCKET_LOST_CONNECTION = "socketLostConnection", BackgroundMessageType.REBOOT = "socketReconnect", 
-        BackgroundMessageType.PING = "ping", BackgroundMessageType.LOG_EVENT = "logEvent";
+        BackgroundMessageType.PING = "ping", BackgroundMessageType.LOG_EVENT = "logEvent", 
+        BackgroundMessageType.LOG_EXPERIMENT = "logExpirement";
     }(BackgroundMessageType || (BackgroundMessageType = {}));
     class LogEventMessage extends BackgroundMessage {
         constructor(sender, target, data) {
@@ -381,10 +374,13 @@
                     return SERVICE_SITES.some((str => url.hostname.includes(str)));
                 }(url) ? $(".wrongSite").removeClass("hidden") : $(".serviceSite").removeClass("hidden") : $(".unsupportedSite").removeClass("hidden"), 
                 void $(".disconnected").addClass("hidden");
-                Messaging_MessagePasser.addListener((function onMessage(message, sender, sendResponse) {
-                    var _sender$tab;
-                    (null === (_sender$tab = sender.tab) || void 0 === _sender$tab ? void 0 : _sender$tab.id) == extensionTab.id && "Popup" == message.target && "Content_Script" == message.sender && (message.type === ClientMessageType.CONTENT_SCRIPT_READY ? (stopSpinning(), 
-                    async function() {
+                Messaging_MessagePasser.addListener((function(message, sender, sendResponse) {
+                    "Service_Background" == message.sender && "Popup" == message.target && message.type == PopupMessageType.CLOSE_POPUP && window.close();
+                    return !1;
+                })), initContentScriptsAsync().then((async function() {
+                    const isContentScriptReadyMessage = new IsContentSriptReadyMessage("Popup", "Content_Script"), response = await Messaging_MessagePasser.sendMessageToTabAsync(isContentScriptReadyMessage, extensionTab.id);
+                    response.error ? (showError(response.error.message, response.error.showButton), 
+                    stopSpinning()) : (stopSpinning(), async function() {
                         startSpinning();
                         const getInitDataMessage = new GetInitDataMessage("Popup", "Content_Script"), response = await Messaging_MessagePasser.sendMessageToTabAsync(getInitDataMessage, extensionTab.id);
                         if (response.inSession && response.partyUrl) {
@@ -393,15 +389,7 @@
                             response.showReviewMessage;
                         }
                         stopSpinning();
-                    }(), debug("Content Script Ready"), sendResponse(), Messaging_MessagePasser.removeListener(onMessage)) : message.type === ClientMessageType.CONTENT_SCRIPT_ERROR && (showError(message.data.message, message.data.showButton), 
-                    stopSpinning(), sendResponse(), Messaging_MessagePasser.removeListener(onMessage)));
-                    return !1;
-                })), Messaging_MessagePasser.addListener((function(message, sender, sendResponse) {
-                    "Service_Background" == message.sender && "Popup" == message.target && message.type == PopupMessageType.CLOSE_POPUP && window.close();
-                    return !1;
-                })), initContentScriptsAsync().then((async function() {
-                    const isContentScriptReadyMessage = new IsContentSriptReadyMessage("Popup", "Content_Script");
-                    Messaging_MessagePasser.sendMessageToTabAsync(isContentScriptReadyMessage, extensionTab.id);
+                    }(), debug("Content Script Ready"));
                 }));
             }
             function handleResponseError(response) {
@@ -424,7 +412,7 @@
                     if (response && response.sessionId) {
                         const sessionId = response.sessionId;
                         showConnected(function(sessionId) {
-                            return `https://www.tele.pe/join/${sessionId}`;
+                            return `https://redirect.teleparty.com/join/${sessionId}`;
                         }(sessionId));
                     } else handleResponseError(response);
                     stopSpinning();

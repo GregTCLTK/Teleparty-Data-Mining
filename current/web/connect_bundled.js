@@ -37,7 +37,6 @@
             if (redirectDataMap && redirectDataMap[sessionDataKey]) {
                 const redirectData = redirectDataMap[sessionDataKey];
                 if (this._isRedirectDataValid(redirectData)) return redirectData;
-                await this.deleteRedirectDataForTabAsync(tabId);
             }
         }
         async deleteRedirectDataForTabAsync(tabId) {
@@ -75,7 +74,7 @@
         }
     };
     Object.freeze(SessionMap);
-    const ChromeStorage_SessionMap = SessionMap;
+    const ChromeStorage_SessionMap = SessionMap, Permissions_namespaceObject = JSON.parse('{"t":["*://*.netflix.com/*","*://*.disneyplus.com/*","*://*.hbomax.com/*","*://*.hbonow.com/*","*://*.amazon.com/*","*://*.primevideo.com/*","*://*.netflixparty.com/*","*://*.teleparty.com/*","*://*.tele.pe/*"]}');
     function _defineProperty(obj, key, value) {
         return key in obj ? Object.defineProperty(obj, key, {
             value,
@@ -84,15 +83,7 @@
             writable: !0
         }) : obj[key] = value, obj;
     }
-    let BackgroundMessageType;
-    !function(BackgroundMessageType) {
-        BackgroundMessageType.JOIN_SESSION = "joinSession", BackgroundMessageType.GET_VIDEO_DATA = "getVideoData", 
-        BackgroundMessageType.LOAD_SESSION = "loadSession", BackgroundMessageType.NO_SESSION_DATA = "noSessionData", 
-        BackgroundMessageType.TEARDOWN = "teardown", BackgroundMessageType.ON_VIDEO_UPDATE = "onVideoUpdate", 
-        BackgroundMessageType.SOCKET_LOST_CONNECTION = "socketLostConnection", BackgroundMessageType.REBOOT = "socketReconnect", 
-        BackgroundMessageType.PING = "ping", BackgroundMessageType.LOG_EVENT = "logEvent";
-    }(BackgroundMessageType || (BackgroundMessageType = {}));
-    class LogEventMessage extends class extends class {
+    class BackgroundMessage extends class {
         constructor(sender, target, type) {
             _defineProperty(this, "sender", void 0), _defineProperty(this, "target", void 0), 
             _defineProperty(this, "type", void 0), this.sender = sender, this.target = target, 
@@ -108,7 +99,17 @@
                 writable: !0
             }) : obj[key] = value, this.type = type;
         }
-    } {
+    }
+    let BackgroundMessageType;
+    !function(BackgroundMessageType) {
+        BackgroundMessageType.JOIN_SESSION = "joinSession", BackgroundMessageType.GET_VIDEO_DATA = "getVideoData", 
+        BackgroundMessageType.LOAD_SESSION = "loadSession", BackgroundMessageType.NO_SESSION_DATA = "noSessionData", 
+        BackgroundMessageType.TEARDOWN = "teardown", BackgroundMessageType.ON_VIDEO_UPDATE = "onVideoUpdate", 
+        BackgroundMessageType.SOCKET_LOST_CONNECTION = "socketLostConnection", BackgroundMessageType.REBOOT = "socketReconnect", 
+        BackgroundMessageType.PING = "ping", BackgroundMessageType.LOG_EVENT = "logEvent", 
+        BackgroundMessageType.LOG_EXPERIMENT = "logExpirement";
+    }(BackgroundMessageType || (BackgroundMessageType = {}));
+    class LogEventMessage extends BackgroundMessage {
         constructor(sender, target, data) {
             var obj, key, value;
             super(sender, target, BackgroundMessageType.LOG_EVENT), value = void 0, (key = "data") in (obj = this) ? Object.defineProperty(obj, key, {
@@ -162,8 +163,42 @@
             }));
         }
     };
-    function sendResolve(message) {
-        window.top.postMessage(message, "https://staging.tele.pe"), window.top.postMessage(message, "https://www.tele.pe");
+    class LogExperimentMessage extends BackgroundMessage {
+        constructor(sender, target, data) {
+            var obj, key, value;
+            super(sender, target, BackgroundMessageType.LOG_EXPERIMENT), value = void 0, (key = "data") in (obj = this) ? Object.defineProperty(obj, key, {
+                value,
+                enumerable: !0,
+                configurable: !0,
+                writable: !0
+            }) : obj[key] = value, this.data = data;
+        }
+    }
+    async function checkHasDefaultPermissions(version) {
+        const requestOrigins = getOriginsForExperimentVersion(version);
+        return new Promise((resolve => {
+            chrome.permissions.contains({
+                origins: requestOrigins
+            }, (hasPermissions => {
+                resolve(hasPermissions);
+            }));
+        }));
+    }
+    function getOriginsForExperimentVersion(version) {
+        return "all_sites" === version || "all_sites" === version ? [ "*://*/*" ] : Permissions_namespaceObject.t;
+    }
+    async function storeSessionDataAsync(sessionData, callback) {
+        const tabId = await getCurrentTabIdAsync();
+        tabId && await ChromeStorage_SessionMap.storeRedirectDataForTabAsync(sessionData, tabId);
+        const {sessionId, service} = sessionData, logMessage = new LogEventMessage("Iframe", "Service_Background", {
+            sessionId,
+            eventType: `redirect-${service}-chrome`
+        });
+        try {
+            await Messaging_MessagePasser.sendMessageToExtension(logMessage, 2500);
+        } finally {
+            callback("resolveRedirect");
+        }
     }
     async function getCurrentTabIdAsync() {
         return new Promise((resolve => {
@@ -176,47 +211,106 @@
             }));
         }));
     }
-    console.log("Here"), window.addEventListener("message", (function(event) {
-        console.log("Got event"), "https://staging.tele.pe" !== event.origin && "https://www.tele.pe" !== event.origin || (event.data && event.data.sessionId ? async function(sessionData) {
-            const tabId = await getCurrentTabIdAsync();
-            tabId && await ChromeStorage_SessionMap.storeRedirectDataForTabAsync(sessionData, tabId);
-            const {sessionId, service} = sessionData, logMessage = new LogEventMessage("Iframe", "Service_Background", {
-                sessionId,
-                eventType: `redirect-${service}`
-            });
-            try {
-                await Messaging_MessagePasser.sendMessageToExtension(logMessage, 2500);
-            } finally {
-                sendResolve("resolveRedirect");
+    console.log("Loaded"), window.addEventListener("message", (function(event) {
+        if (function(event) {
+            return null != event.origin.match(/^https:\/\/[^.]*\.(?:(?:tele\.pe)|(?:teleparty\.com)|(?:netflixparty\.com))$/);
+        }(event)) {
+            const message = event.data;
+            if (message) {
+                const callback = function(event) {
+                    return message => {
+                        if (event.data.callbackId) {
+                            const returnMessage = {
+                                callbackId: event.data.callbackId,
+                                data: message
+                            };
+                            window.top.postMessage(returnMessage, event.origin);
+                        } else window.top.postMessage(message, event.origin);
+                    };
+                }(event);
+                console.log(message), "SetRedirectData" == message.type ? storeSessionDataAsync(message.data, callback) : message.sessionId ? storeSessionDataAsync(message, callback) : "SetOldScript" == message.type ? async function(callback) {
+                    const tabId = await getCurrentTabIdAsync();
+                    tabId ? chrome.storage.local.get("oldScriptMap", (res => {
+                        var _res$oldScriptMap;
+                        let oldScriptMap = null !== (_res$oldScriptMap = res.oldScriptMap) && void 0 !== _res$oldScriptMap ? _res$oldScriptMap : {};
+                        oldScriptMap[tabId] = {
+                            date: Date.now()
+                        }, oldScriptMap = ChromeStorage_SessionMap.filterPhaseScriptData(oldScriptMap), 
+                        chrome.storage.local.set({
+                            oldScriptMap
+                        }, (() => {
+                            callback("resolvePhase");
+                        }));
+                    })) : callback("resolvePhase");
+                }(callback) : "SetNewScript" === message.type ? async function(callback) {
+                    const tabId = await getCurrentTabIdAsync();
+                    tabId ? chrome.storage.local.get("newScriptMap", (res => {
+                        var _res$newScriptMap;
+                        let newScriptMap = null !== (_res$newScriptMap = res.newScriptMap) && void 0 !== _res$newScriptMap ? _res$newScriptMap : {};
+                        newScriptMap[tabId] = {
+                            date: Date.now()
+                        }, newScriptMap = ChromeStorage_SessionMap.filterPhaseScriptData(newScriptMap), 
+                        chrome.storage.local.set({
+                            newScriptMap
+                        }, (() => {
+                            callback("resolvePhase");
+                        }));
+                    })) : callback("resolvePhase");
+                }(callback) : "GetPermissions" === message.type ? async function(callback, data) {
+                    const alreadyHasPermissions = await checkHasDefaultPermissions(data.version), permissionsGranted = alreadyHasPermissions || await async function(site, version) {
+                        return new Promise((resolve => {
+                            var _document$querySelect2;
+                            const clickListener = async () => {
+                                if (![ "all_sites", "services" ].includes(version)) return;
+                                const loggedVersion = `${version}-${site}`, requestOrigins = getOriginsForExperimentVersion(version), logExperimentMessage = new LogExperimentMessage("Iframe", "Service_Background", {
+                                    experimentName: "permissions_request",
+                                    experimentVersion: loggedVersion,
+                                    eventType: "permissions-prompted"
+                                });
+                                Messaging_MessagePasser.sendMessageToExtension(logExperimentMessage), chrome.permissions.request({
+                                    origins: requestOrigins
+                                }, (granted => {
+                                    var _chrome$runtime$lastE;
+                                    null == granted && console.log(null === (_chrome$runtime$lastE = chrome.runtime.lastError) || void 0 === _chrome$runtime$lastE ? void 0 : _chrome$runtime$lastE.message);
+                                    const logExperimentMessage = new LogExperimentMessage("Iframe", "Service_Background", {
+                                        experimentName: "permissions_request",
+                                        experimentVersion: loggedVersion,
+                                        eventType: granted ? "permissions-granted" : "permissions-denied"
+                                    });
+                                    Messaging_MessagePasser.sendMessageToExtension(logExperimentMessage, 2500).catch((() => {})).then((() => {
+                                        var _document$querySelect;
+                                        resolve(granted), null === (_document$querySelect = document.querySelector("html")) || void 0 === _document$querySelect || _document$querySelect.removeEventListener("click", clickListener);
+                                    }));
+                                }));
+                            };
+                            null === (_document$querySelect2 = document.querySelector("html")) || void 0 === _document$querySelect2 || _document$querySelect2.addEventListener("click", clickListener);
+                        }));
+                    }(data.site, data.version);
+                    callback(permissionsGranted);
+                }(callback, message.data) : "CheckHasPermissions" === message.type ? checkHasDefaultPermissions(message.data.experiment).then(callback) : "logExperiment" === message.type ? async function(experimentData, callback) {
+                    const {experimentName, experimentVersion, event} = experimentData, logExperimentMessage = new LogExperimentMessage("Iframe", "Service_Background", {
+                        experimentName,
+                        experimentVersion,
+                        eventType: event
+                    });
+                    try {
+                        await Messaging_MessagePasser.sendMessageToExtension(logExperimentMessage, 2500);
+                    } finally {
+                        callback();
+                    }
+                }(message.data, callback) : "storeExperimentVersion" === message.type && async function(data, callback) {
+                    var _results$experiments;
+                    const {experimentName, experimentVersion} = data, results = await ChromeStorage_ChromeStorageReader.getItemsAsync([ "experiments" ]), experimentData = null !== (_results$experiments = results.experiments) && void 0 !== _results$experiments ? _results$experiments : {};
+                    experimentData[experimentName] = experimentVersion;
+                    try {
+                        await ChromeStorage_ChromeStorageWriter.setItemsAsync({
+                            experiments: experimentData
+                        });
+                    } finally {
+                        callback();
+                    }
+                }(message.data, callback);
             }
-        }(event.data) : event.data && "SetOldScript" == event.data.type ? async function() {
-            const tabId = await getCurrentTabIdAsync();
-            tabId ? chrome.storage.local.get("oldScriptMap", (res => {
-                var _res$oldScriptMap;
-                let oldScriptMap = null !== (_res$oldScriptMap = res.oldScriptMap) && void 0 !== _res$oldScriptMap ? _res$oldScriptMap : {};
-                oldScriptMap[tabId] = {
-                    date: Date.now()
-                }, oldScriptMap = ChromeStorage_SessionMap.filterPhaseScriptData(oldScriptMap), 
-                chrome.storage.local.set({
-                    oldScriptMap
-                }, (() => {
-                    sendResolve("resolvePhase");
-                }));
-            })) : sendResolve("resolvePhase");
-        }() : event.data && "SetNewScript" === event.data.type && async function() {
-            const tabId = await getCurrentTabIdAsync();
-            tabId ? chrome.storage.local.get("newScriptMap", (res => {
-                var _res$newScriptMap;
-                let newScriptMap = null !== (_res$newScriptMap = res.newScriptMap) && void 0 !== _res$newScriptMap ? _res$newScriptMap : {};
-                newScriptMap[tabId] = {
-                    date: Date.now()
-                }, newScriptMap = ChromeStorage_SessionMap.filterPhaseScriptData(newScriptMap), 
-                chrome.storage.local.set({
-                    newScriptMap
-                }, (() => {
-                    sendResolve("resolvePhase");
-                }));
-            })) : sendResolve("resolvePhase");
-        }());
+        }
     }), !1);
 })();
